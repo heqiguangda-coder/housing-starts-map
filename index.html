@@ -152,6 +152,11 @@ dialog.gloss::backdrop{background:rgba(10,16,14,.45)}
 .gloss dd{margin:2px 0 0;font-size:13.5px;line-height:1.65}
 .gloss .x{font:inherit;font-size:20px;line-height:1;background:none;border:0;color:var(--muted);cursor:pointer;width:36px;height:36px;border-radius:50%}
 .gloss .x:hover{background:var(--sunk);color:var(--ink)}
+.dslist{display:grid;gap:6px}
+.dsrow{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px}
+.dsrow.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+#dsSel{max-width:15em;font-weight:700}
+@media (max-width:700px){header.top .row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center}#dsSel{max-width:100%}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion: reduce){#map path{transition:none}}
 section[id],details[id]{scroll-margin-top:12px}
@@ -207,6 +212,7 @@ section[id],details[id]{scroll-margin-top:12px}
     </div>
     <div class="row">
       <span class="badge" id="srcBadge">データ</span>
+      <span class="fld" id="dsWrap" hidden><select id="dsSel" aria-label="表示するデータ"></select></span>
       <button class="btn" id="openData" type="button">データを読み込む</button>
     </div>
   </header>
@@ -364,7 +370,9 @@ section[id],details[id]{scroll-margin-top:12px}
         <div class="status" id="fileStatus"></div>
         <p id="srcDetail"></p>
         <p class="note" id="saveInfo" style="margin:0"></p>
-        <button class="btn" id="demoBtn" type="button">保存データを消して架空データに戻す</button>
+        <h3 style="margin-top:4px">保存したデータ</h3>
+        <div class="dslist" id="dsList"></div>
+        <button class="btn" id="demoBtn" type="button">保存データをすべて消して架空データに戻す</button>
         <h3 style="margin-top:8px">出典と注意</h3>
         <p>原典：国土交通省「<a href="https://www.mlit.go.jp/sogoseisaku/jouhouka/sosei_jouhouka_tk4_000002.html" target="_blank" rel="noopener">建築着工統計調査</a>」（毎月末頃に前月分を公表）、<a href="https://www.e-stat.go.jp/stat-search/database?toukei=00600120" target="_blank" rel="noopener">e-Stat</a>。統計表の「−」は0、「…」「x」は欠測として扱います。累計・年計は月次値の合計で、期間内に欠測月があると表示しません。1戸あたり工事費など比率の指標は合計できないため単月で見てください。</p>
       </section>
@@ -677,12 +685,13 @@ function save(){store.set("view",{mode:S.mode,metric:S.metric,trend:S.trend,sel:
 function setSource(src,keepView,fromSave){
   SRC=src;memo.clear();
   if(src.kind!=="demo"&&!fromSave)persist(src);
+  setTimeout(()=>{try{renderDsList()}catch(e){}},0);
   const saved=keepView?store.get("view"):null;
   S.sel={};
   for(const d of SRC.dims){
     let v=saved&&saved.sel&&d.values.includes(saved.sel[d.name])?saved.sel[d.name]:null;
     if(!v&&/工事/.test(d.name))v=d.values.find(x=>x==="新設");
-    if(!v)v=d.values.find(x=>/総数|^計$|合計|総計|^全体$|^総$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values[0];
+    if(!v)v=d.values.find(x=>/^(総数|計|合計|総計|全体|総)$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values[0];
     S.sel[d.name]=v}
   if(saved){S.metric=saved.metric||S.metric;S.trend=saved.trend||S.trend;S.mode=saved.mode||S.mode}
   if(!SRC.months.length&&["month","ytd","ttm"].includes(S.mode))S.mode=SRC.fys.length&&!SRC.annual.length?"fy":"year";
@@ -871,7 +880,7 @@ $("bdDim").addEventListener("change",e=>{S.bd=e.target.value;save();render()});
 $("tbl").addEventListener("click",e=>{const b=e.target.closest("th button");if(b){const k=b.dataset.k;if(S.sortK===k)S.sortD*=-1;else{S.sortK=k;S.sortD=k==="p"?1:-1}render();return}
   const tr=e.target.closest("tbody tr");if(tr)selectArea(+tr.dataset.p)});
 $("openData").addEventListener("click",()=>{const d=$("dataPanel");d.open=true;d.scrollIntoView({behavior:"smooth",block:"start"})});
-$("demoBtn").addEventListener("click",async()=>{setSource(makeDemo(),false);try{await IDB.del("source")}catch(e){}showSaved("");$("fileStatus").textContent="保存データを消して、架空データに戻しました。"});
+$("demoBtn").addEventListener("click",async()=>{for(const x of META.list){try{await IDB.del("ds:"+x.key)}catch(e){}}try{await IDB.del("source")}catch(e){}META={active:null,list:[]};await saveMeta();setSource(makeDemo(),false);showSaved("");$("fileStatus").textContent="保存データをすべて消して、架空データに戻しました。"});
 $("copyBtn").addEventListener("click",async()=>{
   const u=LAST.unit?"（"+LAST.unit+"）":"";
   const lines=[["都道府県","当期"+u,"前年同期"+u,"増減","前年同期比(%)","判定"].join("\t")];
@@ -887,12 +896,13 @@ let XLSXP=null;
 function loadXLSX(){return XLSXP||(XLSXP=new Promise((res,rej)=>{if(window.XLSX)return res(window.XLSX);const s=document.createElement("script");s.src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";s.onload=()=>res(window.XLSX);s.onerror=()=>{XLSXP=null;rej(new Error("Excel読込ライブラリを取得できませんでした"))};document.head.appendChild(s)}))}
 async function handleFiles(files){
   const st=$("fileStatus");st.className="status";st.textContent="読み込み中…";
-  const all=[];const msgs=[];
+  const all=[];const msgs=[];const tabNos=new Set();
   for(const f of files){
     try{
       const buf=await f.arrayBuffer();let recs=[];
       if(/\.(xlsx|xls)$/i.test(f.name)){
         const X=await loadXLSX();const wb=X.read(buf,{type:"array"});
+        for(const n of wb.SheetNames){const no=tableNoOf(X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}).slice(0,6));if(no){tabNos.add(no);break}}
         for(const n of wb.SheetNames){try{const r=rowsToRecords(X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}),findYM(f.name));recs=recs.concat(r)}catch(e){}}
         if(!recs.length)throw new Error("どのシートからも数値を読み取れませんでした");
       }else recs=rowsToRecords(parseCSV(decodeText(buf)),findYM(f.name));
@@ -900,10 +910,11 @@ async function handleFiles(files){
     }catch(e){msgs.push(`${f.name}：${e.message}`)}
   }
   try{
-    const add=$("appendChk").checked&&SRC&&SRC.kind!=="demo"&&SRC.recs;
-    const merged=add?SRC.recs.concat(all):all;
-    const src=buildSource(merged,add?SRC.label+" ＋ "+(files.length===1?files[0].name:`${files.length}ファイル`):(files.length===1?files[0].name:`${files.length}ファイル`),"file");
-    setSource(src,false);st.textContent="読み込みました。"+msgs.join("／");
+    if(!all.length)throw new Error("集計できる行がありません");
+    const fname=files.length===1?files[0].name:`${files.length}ファイル`;
+    const key=tabNos.size===1?"表"+[...tabNos][0]:fname;
+    const ds=await loadDataset(all,key,fname,"file");
+    st.textContent=`「${ds.label}」に読み込みました。`+msgs.join("／");
   }catch(e){st.className="status err";st.textContent=e.message+"　"+msgs.join("／")}
 }
 $("fileIn").addEventListener("change",e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value=""});
@@ -981,7 +992,8 @@ $("apiBtn").addEventListener("click",async()=>{
         st.textContent=`取得中… ${months[i].replace("-","年")}月（${i+1}/${months.length}表）`;
         const r=await fetchTable(a,f.items.get(months[i]),"",months[i]);
         all=all.concat(r.recs)}
-      setSource(buildSource(all,`e-Stat ${f.title}`,"api"),false);
+      const mno=f.title.match(/^\s*(\d+)\s/);
+      await loadDataset(all,mno?"表"+mno[1]:"e-Stat "+f.title,`e-Stat ${f.title}`,"api");
       st.textContent=`取得しました（${months.length}か月分・${nf.format(all.length)}件）。`;
     }else await fetchSingle(a,fromY);
   }catch(e){apiErr(e)}finally{$("apiBtn").disabled=false}
@@ -997,7 +1009,7 @@ async function fetchSingle(a,fromY){
       const r=await fetchTable(a,id,q,null,n=>st.textContent=`データを取得中…（${nf.format(n)}件）`);
       const recs=r.recs.filter(x=>+x.t.replace("FY","").slice(0,4)>=fromY-1);
       if(!recs.length)throw new Error("開始年以降のデータがこの統計表にありません。「月次表を集める」を使ってください。");
-      setSource(buildSource(recs,`e-Stat ${id} ${r.title}`,"api"),false);
+      await loadDataset(recs,ID_TABLE[id]||"e-Stat "+id,`e-Stat ${id} ${r.title}`,"api");
       const last=[...new Set(recs.map(x=>x.t))].sort().pop();
       st.textContent=`取得しました（${nf.format(recs.length)}件、最新：${last.replace("-","年")}${last.length===7?"月":""}）。それ以降の月はExcelを「今のデータに追加する」で足してください。`;
 }
@@ -1047,8 +1059,7 @@ $("xLoad").addEventListener("click",async()=>{
       const wb=X.read(await res.arrayBuffer(),{type:"array"});
       for(const n of wb.SheetNames){try{all=all.concat(rowsToRecords(X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}),f.t))}catch(e){}}}
     if(!all.length)throw new Error("Excelから数値を読み取れませんでした。");
-    const add=$("appendChk").checked&&SRC&&SRC.kind!=="demo"&&SRC.recs;
-    setSource(buildSource(add?SRC.recs.concat(all):all,`e-Stat 表${$("xTab").value}（月次Excel）`,"file"),false);
+    await loadDataset(all,"表"+$("xTab").value,`e-Stat 表${$("xTab").value}（月次Excel）`,"file");
     st.textContent=`${XFILES.length}か月分を読み込みました。`;
   }catch(e){st.className="status err";
     st.textContent=(e instanceof TypeError)?"e-Statのファイルはアプリから直接読み込めませんでした（ブラウザの制限）。月のボタンで保存し、「ファイルを選ぶ」から選んでください。":"読み込めませんでした："+e.message}
@@ -1078,19 +1089,66 @@ function unpackSource(p){
 }
 const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
 function showSaved(msg){$("saveInfo").textContent=msg}
+const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別"};
+const ID_TABLE={"0003114535":"表15","0003114565":"表16"};
+function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表/);return m?String(+m[1]):null}
+let META={active:null,list:[]};
+async function saveMeta(){try{await IDB.put("meta",META)}catch(e){}renderDsList()}
+async function loadDataset(recs,key,label,kind){
+  let base=null;
+  if($("appendChk").checked){
+    if(META.list.some(x=>x.key===key)){try{const p=await IDB.get("ds:"+key);if(p&&p.arr)base=unpackSource(p).recs}catch(e){}}
+    else if(SRC&&SRC.kind!=="demo"&&SRC.recs){base=SRC.recs;key=SRC.key||key}
+  }
+  const src=buildSource(base?base.concat(recs):recs,TABLE_NAMES[key]||label,kind);src.key=key;
+  setSource(src,false);return src;
+}
 async function persist(src){
-  try{await IDB.put("source",packSource(src));src.savedAt=Date.now();showSaved(`この端末に保存しました（${fmtDT(src.savedAt)}）。再読み込みしても残ります。`)}
-  catch(e){showSaved("この端末に保存できませんでした（プライベートブラウズでは保存されません）。")}
+  const key=src.key||src.label;src.key=key;
+  try{
+    await IDB.put("ds:"+key,packSource(src));src.savedAt=Date.now();
+    const range=src.months.length?`${src.months[0].replace("-","年")}月〜${src.months[src.months.length-1].replace("-","年")}月`:"";
+    META.list=META.list.filter(x=>x.key!==key);META.list.push({key,label:src.label,savedAt:src.savedAt,range});
+    META.active=key;await saveMeta();
+    showSaved(`「${src.label}」をこの端末に保存しました（${fmtDT(src.savedAt)}）。`);
+  }catch(e){showSaved("この端末に保存できませんでした（プライベートブラウズでは保存されません）。")}
+}
+async function switchDataset(key){
+  if(key==="__demo"){META.active=null;await saveMeta();setSource(makeDemo(),true);showSaved("");return}
+  try{const p=await IDB.get("ds:"+key);if(!p||!p.arr)throw 0;const src=unpackSource(p);src.key=key;setSource(src,true,true);
+    META.active=key;await saveMeta();showSaved(`保存した「${src.label}」を表示しています（${fmtDT(src.savedAt)} 保存）。`)}
+  catch(e){showSaved("保存データを開けませんでした。");}
+}
+async function deleteDataset(key){
+  try{await IDB.del("ds:"+key)}catch(e){}
+  META.list=META.list.filter(x=>x.key!==key);
+  if(META.active===key){const next=META.list[META.list.length-1];await saveMeta();if(next)await switchDataset(next.key);else await switchDataset("__demo")}
+  else await saveMeta();
+}
+function renderDsList(){
+  const sel=$("dsSel");
+  sel.innerHTML=META.list.map(x=>`<option value="${esc(x.key)}">${esc(x.label)}</option>`).join("")+`<option value="__demo">架空データ（操作確認用）</option>`;
+  sel.value=SRC&&SRC.kind!=="demo"&&META.list.some(x=>x.key===SRC.key)?SRC.key:"__demo";
+  $("dsWrap").hidden=!META.list.length;
+  $("dsList").innerHTML=META.list.length?META.list.map(x=>`<div class="dsrow${SRC&&SRC.key===x.key?" on":""}"><div><b>${esc(x.label)}</b><br><span class="note">${esc(x.range||"")}　${fmtDT(x.savedAt)} 保存</span></div><div class="row" style="gap:6px"><button type="button" class="btn" data-open="${esc(x.key)}">表示</button><button type="button" class="btn" data-del="${esc(x.key)}">削除</button></div></div>`).join(""):`<p class="note" style="margin:0">保存したデータはまだありません。</p>`;
 }
 let rz;let lastW=0;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{const w=$("trend").clientWidth;if(SRC&&w!==lastW){lastW=w;renderTrend(selKey(S.sel),SRC.unit(selKey(S.sel)))}},150)});
 $("tabbar").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const t=$(b.dataset.t);if(t.tagName==="DETAILS")t.open=true;t.scrollIntoView({behavior:"smooth",block:"start"})});
 if("IntersectionObserver" in window){const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting)for(const b of $("tabbar").querySelectorAll("button"))b.setAttribute("aria-current",String(b.dataset.t===e.target.id))},{rootMargin:"-40% 0px -55% 0px"});["secCond","secMap","secTable","secTrend","dataPanel"].forEach(id=>io.observe($(id)))}
+$("dsSel").addEventListener("change",e=>switchDataset(e.target.value));
+$("dsList").addEventListener("click",e=>{const o=e.target.closest("[data-open]"),d=e.target.closest("[data-del]");
+  if(o)switchDataset(o.dataset.open);
+  if(d){if(d.dataset.confirm){deleteDataset(d.dataset.del)}else{d.dataset.confirm="1";d.textContent="本当に削除";setTimeout(()=>{if(d.isConnected){delete d.dataset.confirm;d.textContent="削除"}},3000)}}});
 buildMap();
 (async()=>{
-  let saved=null;
-  try{const p=await IDB.get("source");if(p&&p.arr)saved=unpackSource(p)}catch(e){}
-  if(saved){setSource(saved,true,true);showSaved(`この端末に保存したデータを表示しています（${fmtDT(saved.savedAt)} 保存）。`)}
-  else setSource(makeDemo(),true);
+  try{const m=await IDB.get("meta");if(m&&m.list)META=m}catch(e){}
+  try{ // 旧形式（1件のみ保存）からの移行
+    const old=await IDB.get("source");
+    if(old&&old.arr){const src=unpackSource(old);const k=tableNoOf([[src.label]])?"表"+tableNoOf([[src.label]]):src.label;
+      await IDB.put("ds:"+k,old);META.list=META.list.filter(x=>x.key!==k);META.list.push({key:k,label:src.label,savedAt:old.savedAt,range:""});META.active=k;await IDB.put("meta",META);await IDB.del("source")}
+  }catch(e){}
+  if(META.active&&META.list.some(x=>x.key===META.active))await switchDataset(META.active);
+  else{setSource(makeDemo(),true);renderDsList()}
 })();
 </script>
 
