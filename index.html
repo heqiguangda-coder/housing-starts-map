@@ -287,19 +287,30 @@ section[id],details[id]{scroll-margin-top:12px}
         <h3>e-Stat API から取得する</h3>
         <p>e-Stat の利用登録で発行されるアプリケーションIDが必要です。この公開ページからは外部APIに接続できません。同じHTMLをGitHub Pagesなどのウェブ上に置いて開くと使えます（iPhoneのSafariでも可）。</p>
         <div class="fld"><label for="appId">アプリケーションID</label><input id="appId" type="text" autocomplete="off" placeholder="appId"></div>
-        <div class="fld"><label for="sdPreset">統計表</label>
-          <select id="sdPreset">
-            <option value="0003119736">【住宅】利用関係別 構造別 建て方別 都道府県別 戸数</option>
-            <option value="0003119735">同上（年次）</option>
-            <option value="0003114535">15 都道府県別、工事別、利用関係別／戸数・件数、床面積</option>
-            <option value="0003114565">16 都道府県別、工事別、住宅の種類別、建て方別</option>
-            <option value="">統計表IDを直接入力</option>
-          </select></div>
+        <div class="fld"><span class="lbl">取得方法</span>
+          <div class="seg" id="apiSeg" role="group" aria-label="取得方法"><button type="button" data-v="monthly" aria-pressed="true">月次表を集める</button><button type="button" data-v="single" aria-pressed="false">統計表IDを指定</button></div></div>
         <div class="row">
-          <div class="fld"><label for="sdId">統計表ID</label><input id="sdId" type="text" value="0003119736" style="width:9em"></div>
-          <div class="fld"><label for="fromY">取得開始年</label><input id="fromY" type="number" value="2021" min="1960" max="2100" style="width:6em"></div>
-          <button class="btn primary" id="apiBtn" type="button">取得</button>
+          <div class="fld"><label for="fromY">取得開始年</label><input id="fromY" type="number" value="2024" min="1960" max="2100" style="width:6em"></div>
         </div>
+        <div id="apiMonthly" class="controls">
+          <div class="row">
+            <div class="fld" style="flex:1"><label for="kw">表の検索語</label><input id="kw" type="text" value="都道府県別"></div>
+            <button class="btn" id="findBtn" type="button">表を探す</button>
+          </div>
+          <div class="fld" id="famWrap" hidden><label for="famSel">統計表（毎月公表分）</label><select id="famSel"></select></div>
+          <p class="note" style="margin:0">毎月公表される同じ名前の統計表を、開始年の前年1月から最新月まで集めて結合します。前年同期比のため、開始年の前年分も取得します。</p>
+        </div>
+        <div id="apiSingle" class="controls" hidden>
+          <div class="fld"><label for="sdPreset">統計表</label>
+            <select id="sdPreset">
+              <option value="0003119736">【住宅】利用関係別 構造別 建て方別 都道府県別 戸数（時系列）</option>
+              <option value="0003119735">同上（年次）</option>
+              <option value="">統計表IDを直接入力</option>
+            </select></div>
+          <div class="fld"><label for="sdId">統計表ID</label><input id="sdId" type="text" value="0003119736" style="width:9em"></div>
+          <p class="note" style="margin:0">時系列表は年1回の更新のため、最新月が含まれないことがあります。</p>
+        </div>
+        <button class="btn primary" id="apiBtn" type="button">取得</button>
         <div class="status" id="apiStatus"></div>
       </section>
       <section>
@@ -472,15 +483,15 @@ function buildSource(recs,label,kind){
     unit:sel=>units.get(sel)||"",get:(sel,p,t)=>map.get(sel+"|"+p+"|"+t),count:recs.length};
 }
 /* e-Stat API JSON → レコード */
-function estatToRecords(json){
+function estatToRecords(json,fbT){
   const sd=json.GET_STATS_DATA.STATISTICAL_DATA;
   const objs=[].concat(sd.CLASS_INF.CLASS_OBJ);
   const cls={};for(const o of objs){const m=new Map();for(const c of [].concat(o.CLASS))m.set(c["@code"],c["@name"]);cls[o["@id"]]={name:o["@name"],m}}
   const recs=[];
   for(const v of [].concat(sd.DATA_INF.VALUE||[])){
     const val=parseNum(v["$"]);if(val===undefined)continue;
-    const t=parseTime(cls.time?cls.time.m.get(v["@time"]):"",v["@time"]);if(!t)continue;
-    const pref=v["@area"]!==undefined?matchPref(cls.area.m.get(v["@area"])):0;if(pref===null)continue;
+    const t=(v["@time"]!==undefined&&parseTime(cls.time?cls.time.m.get(v["@time"]):"",v["@time"]))||fbT;if(!t)continue;
+    const pref=v["@area"]!==undefined&&cls.area?matchPref(cls.area.m.get(v["@area"])):0;if(pref===null)continue;
     const dims={};for(const k in v){if(!k.startsWith("@")||k==="@area"||k==="@time"||k==="@unit")continue;const id=k.slice(1);if(cls[id])dims[cls[id].name]=cls[id].m.get(v[k])??v[k]}
     recs.push({dims,pref,t,v:val,unit:v["@unit"]||""})}
   return {recs,title:sd.TABLE_INF&&sd.TABLE_INF.TITLE?(sd.TABLE_INF.TITLE["$"]||sd.TABLE_INF.TITLE):"",next:sd.RESULT_INF&&sd.RESULT_INF.NEXT_KEY};
@@ -776,35 +787,86 @@ function jsonp(url){return new Promise((res,rej)=>{const cb="__estat"+Date.now()
   window[cb]=d=>{done();res(d)};sc.onerror=()=>{done();rej(new TypeError("jsonp"))};sc.src=url+"&callback="+cb;document.head.appendChild(sc)})}
 $("appId").value=store.get("appId")||"";
 $("sdPreset").addEventListener("change",e=>{if(e.target.value)$("sdId").value=e.target.value;else $("sdId").focus()});
-$("apiBtn").addEventListener("click",async()=>{
+let API_MODE="monthly",FAMS=[];
+$("apiSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;API_MODE=b.dataset.v;for(const x of $("apiSeg").querySelectorAll("button"))x.setAttribute("aria-pressed",String(x===b));$("apiMonthly").hidden=API_MODE!=="monthly";$("apiSingle").hidden=API_MODE!=="single"});
+const getJ=async(api,qs)=>{
+  let j;
+  try{j=await (await fetch(`https://api.e-stat.go.jp/rest/3.0/app/json/${api}?${qs}`)).json()}
+  catch(e){if(!(e instanceof TypeError))throw e;j=await jsonp(`https://api.e-stat.go.jp/rest/3.0/app/jsonp/${api}?${qs}`)}
+  const root=j[Object.keys(j)[0]];const r=root&&root.RESULT;
+  if(r&&+r.STATUS>=100)throw new Error(r.ERROR_MSG||("エラー "+r.STATUS));
+  return root;
+};
+const txt=v=>v==null?"":typeof v==="object"?(v["$"]??""):String(v);
+function apiErr(e){const st=$("apiStatus");st.className="status err";
+  st.textContent=(e instanceof TypeError)?"e-Stat に接続できませんでした。GitHub Pagesなどに置いたこのHTMLを開くか、e-StatのCSVを「ファイルを選ぶ」から読み込んでください。":"取得できませんでした："+e.message}
+function apiArgs(){
+  const appId=$("appId").value.trim();const fromY=+$("fromY").value||2024;
+  if(!appId)throw new Error("アプリケーションIDを入力してください。");
+  store.set("appId",appId);return {appId,fromY,a:"appId="+encodeURIComponent(appId)};
+}
+async function findFamilies(){
   const st=$("apiStatus");st.className="status";
-  const appId=$("appId").value.trim(),id=$("sdId").value.trim(),fromY=+$("fromY").value||2021;
-  if(!appId){st.className="status err";st.textContent="アプリケーションIDを入力してください。";return}
-  if(!/^\d{10}$/.test(id)){st.className="status err";st.textContent="統計表IDは10桁の数字です。";return}
-  store.set("appId",appId);$("apiBtn").disabled=true;
-  const getJ=async(api,qs)=>{
-    try{return await (await fetch(`https://api.e-stat.go.jp/rest/3.0/app/json/${api}?${qs}`)).json()}
-    catch(e){if(!(e instanceof TypeError))throw e;return await jsonp(`https://api.e-stat.go.jp/rest/3.0/app/jsonp/${api}?${qs}`)}};
+  const {a,fromY}=apiArgs();const now=new Date();
+  st.textContent="統計表を検索中…";
+  const kw=$("kw").value.trim();
+  const root=await getJ("getStatsList",`${a}&statsCode=00600120&surveyYears=${fromY-1}01-${now.getFullYear()}12&limit=5000${kw?"&searchWord="+encodeURIComponent(kw):""}`);
+  const tabs=[].concat(root.DATALIST_INF&&root.DATALIST_INF.TABLE_INF||[]);
+  const fam=new Map();
+  for(const t of tabs){
+    const sd=String(t.SURVEY_DATE??"").match(/(\d{4})(\d{2})/);if(!sd||+sd[2]<1||+sd[2]>12)continue;
+    const title=t.TITLE&&typeof t.TITLE==="object"?((t.TITLE["@no"]?t.TITLE["@no"]+" ":"")+txt(t.TITLE)):txt(t.TITLE);
+    const key=txt(t.STATISTICS_NAME).replace(/(令和|平成)?\s*\d{1,4}\s*年(\s*\d{1,2}\s*月)?(分)?/g,"").replace(/\s+/g," ").trim()+"｜"+title.replace(/\s+/g," ").trim();
+    if(!fam.has(key))fam.set(key,{key,title,stat:txt(t.STATISTICS_NAME),items:new Map()});
+    const f=fam.get(key);const ymk=ym(sd[1],+sd[2]);
+    const prev=f.items.get(ymk);if(!prev||String(t["@id"])>prev)f.items.set(ymk,String(t["@id"]))}
+  FAMS=[...fam.values()].filter(f=>f.items.size>=2).sort((x,y)=>(/都道府県/.test(y.title)-/都道府県/.test(x.title))||y.items.size-x.items.size);
+  if(!FAMS.length)throw new Error("毎月公表の統計表が見つかりませんでした。検索語を変えてください。");
+  $("famSel").innerHTML=FAMS.map((f,i)=>{const ks=[...f.items.keys()].sort();return `<option value="${i}">${esc(f.title)}（${ks[0].replace("-","年")}月〜${ks[ks.length-1].replace("-","年")}月・${ks.length}表）</option>`}).join("");
+  $("famWrap").hidden=false;
+  st.textContent=`${FAMS.length}種類の統計表が見つかりました。表を選んで「取得」を押してください。`;
+}
+$("findBtn").addEventListener("click",async()=>{$("findBtn").disabled=true;try{await findFamilies()}catch(e){apiErr(e)}finally{$("findBtn").disabled=false}});
+async function fetchTable(a,id,q,fbT,onPage){
+  let start=1,all=[],title="";
+  for(let page=0;page<30;page++){
+    const root=await getJ("getStatsData",`${a}&statsDataId=${id}&metaGetFlg=Y&cntGetFlg=N&sectionHeaderFlg=2&limit=100000&startPosition=${start}${q||""}`);
+    if(!root.STATISTICAL_DATA||!root.STATISTICAL_DATA.DATA_INF)break;
+    const o=estatToRecords({GET_STATS_DATA:root},fbT);all=all.concat(o.recs);title=title||txt(o.title);onPage&&onPage(all.length);
+    if(!o.next)break;start=o.next}
+  return {recs:all,title};
+}
+$("apiBtn").addEventListener("click",async()=>{
+  const st=$("apiStatus");st.className="status";$("apiBtn").disabled=true;
   try{
-    st.textContent="統計表の項目を取得中…";
-    const meta=await getJ("getMetaInfo",`appId=${encodeURIComponent(appId)}&statsDataId=${id}`);
-    const mr=meta.GET_META_INFO;if(mr.RESULT.STATUS!==0)throw new Error(mr.RESULT.ERROR_MSG);
-    const objs=[].concat(mr.METADATA_INF.CLASS_INF.CLASS_OBJ);const to=objs.find(o=>o["@id"]==="time");
-    let q="";
-    if(to){const codes=[].concat(to.CLASS).map(c=>c["@code"]).filter(c=>{const t=parseTime("",c)||"";return +t.replace("FY","").slice(0,4)>=fromY-1}).sort();if(codes.length)q=`&cdTimeFrom=${codes[0]}`}
-    let start=1,all=[],title="";
-    for(let page=0;page<30;page++){
-      st.textContent=`データを取得中…（${nf.format(all.length)}件）`;
-      const j=await getJ("getStatsData",`appId=${encodeURIComponent(appId)}&statsDataId=${id}&metaGetFlg=Y&cntGetFlg=N&sectionHeaderFlg=2&limit=100000&startPosition=${start}${q}`);
-      const r=j.GET_STATS_DATA.RESULT;if(r.STATUS!==0&&r.STATUS!==1)throw new Error(r.ERROR_MSG);
-      if(!j.GET_STATS_DATA.STATISTICAL_DATA.DATA_INF)break;
-      const o=estatToRecords(j);all=all.concat(o.recs);title=title||o.title;if(!o.next)break;start=o.next}
-    setSource(buildSource(all,`e-Stat ${id} ${typeof title==="string"?title:""}`,"api"),false);
-    st.textContent=`取得しました（${nf.format(all.length)}件）。`;
-  }catch(e){
-    st.className="status err";
-    st.textContent=(e instanceof TypeError)?"e-Stat に接続できませんでした。公開ページ上では外部APIへの接続がブラウザで遮断されます。GitHub Pagesなどに置いたこのHTMLを開くか、e-StatのCSVを「ファイルを選ぶ」から読み込んでください。":"取得できませんでした："+e.message;
-  }finally{$("apiBtn").disabled=false}
+    const {a,fromY}=apiArgs();
+    if(API_MODE==="monthly"){
+      if(!FAMS.length)await findFamilies();
+      const f=FAMS[+$("famSel").value||0];
+      const months=[...f.items.keys()].filter(t=>+t.slice(0,4)>=fromY-1).sort();
+      let all=[];
+      for(let i=0;i<months.length;i++){
+        st.textContent=`取得中… ${months[i].replace("-","年")}月（${i+1}/${months.length}表）`;
+        const r=await fetchTable(a,f.items.get(months[i]),"",months[i]);
+        all=all.concat(r.recs)}
+      setSource(buildSource(all,`e-Stat ${f.title}`,"api"),false);
+      st.textContent=`取得しました（${months.length}か月分・${nf.format(all.length)}件）。`;
+    }else{
+      const id=$("sdId").value.trim();
+      if(!/^\d{10}$/.test(id))throw new Error("統計表IDは10桁の数字です。");
+      st.textContent="統計表の項目を取得中…";
+      const mr=await getJ("getMetaInfo",`${a}&statsDataId=${id}`);
+      const objs=[].concat(mr.METADATA_INF.CLASS_INF.CLASS_OBJ);const to=objs.find(o=>o["@id"]==="time");
+      let q="";
+      if(to){const codes=[].concat(to.CLASS).filter(c=>{const t=parseTime(c["@name"],c["@code"]);return t&&+t.replace("FY","").slice(0,4)>=fromY-1}).map(c=>c["@code"]).sort();if(codes.length)q=`&cdTimeFrom=${codes[0]}`}
+      const r=await fetchTable(a,id,q,null,n=>st.textContent=`データを取得中…（${nf.format(n)}件）`);
+      const recs=r.recs.filter(x=>+x.t.replace("FY","").slice(0,4)>=fromY-1);
+      if(!recs.length)throw new Error("開始年以降のデータがこの統計表にありません。「月次表を集める」を使ってください。");
+      setSource(buildSource(recs,`e-Stat ${id} ${r.title}`,"api"),false);
+      const last=[...new Set(recs.map(x=>x.t))].sort().pop();
+      st.textContent=`取得しました（${nf.format(recs.length)}件、最新：${last}）。`;
+    }
+  }catch(e){apiErr(e)}finally{$("apiBtn").disabled=false}
 });
 
 let rz;let lastW=0;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{const w=$("trend").clientWidth;if(SRC&&w!==lastW){lastW=w;renderTrend(selKey(S.sel),SRC.unit(selKey(S.sel)))}},150)});
