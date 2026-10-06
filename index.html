@@ -354,9 +354,16 @@ section[id],details[id]{scroll-margin-top:12px}
         <div class="row">
           <div class="fld"><label for="xTab">表</label>
             <select id="xTab">
+              <optgroup label="住宅（戸数）">
               <option value="15">表15 都道府県別・利用関係別</option>
               <option value="16">表16 都道府県別・建て方別</option>
               <option value="18">表18 都道府県別・構造別・建て方別（新設）</option>
+              </optgroup>
+              <optgroup label="建築物（棟数・床面積・工事費）">
+              <option value="5">表5 建築物 都道府県別・建築主別</option>
+              <option value="6-1">表6-1 建築物 都道府県別・構造別</option>
+              <option value="7-1">表7-1 建築物 都道府県別・用途別</option>
+              </optgroup>
             </select></div>
           <div class="fld"><label for="xFrom">開始年</label><input id="xFrom" type="number" value="2025" min="2000" max="2100" style="width:6em"></div>
           <button class="btn" id="xFind" type="button">ファイルを探す</button>
@@ -471,7 +478,7 @@ function decodeText(buf){
 }
 /* 表（2次元配列）→ レコード */
 function findYM(text){const m=z2h(text).match(/((令和|平成)\s*(元|\d+)|\d{4})\s*年\s*\d{1,2}\s*月/);return m?parseTime(m[0]):null}
-const LEVEL_NAMES=[[/持家|貸家|給与|分譲/,"利用関係"],[/新設|増改築|その他の住宅/,"工事別"],[/戸数|床面積|件数|工事費/,"表章項目"],[/木造|鉄骨|鉄筋|ブロック/,"構造"],[/一戸建|長屋|共同住宅/,"建て方"],[/民間|公営|機構|都市再生|資金/,"資金別"]];
+const LEVEL_NAMES=[[/持家|貸家|給与|分譲/,"利用関係"],[/新設|増改築|その他の住宅/,"工事別"],[/戸数|床面積|件数|工事費|建築物の数/,"表章項目"],[/木造|鉄骨|鉄筋|ブロック/,"構造"],[/一戸建|長屋|共同住宅/,"建て方"],[/民間|公営|機構|都市再生|資金/,"資金別"]];
 function matrixToRecords(rows,fbT){
   const ncol=Math.max(...rows.map(r=>r.length));
   let areaCol=-1,best=0;
@@ -514,7 +521,7 @@ function matrixToRecords(rows,fbT){
   const cols=[];
   for(let j=0;j<ncol;j++){if(j===areaCol)continue;
     const nums=dataRows.filter(r=>isNumericCell(r[j])).length;if(nums<dataRows.length*.6)continue;
-    const labels=ff.map(r=>(r[j]||"計").replace(/^(小計|合計|総計|総数)$/,"計"));
+    const labels=ff.map(r=>(r[j]||"計").replace(/[Ａ-Ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/^([A-Z])(?=[^A-Za-z0-9])/,"$1 ").replace(/^(小計|合計|総計|総数|全建築物計)$/,"計"));
     if(labels.some(l=>/比|％|%|率|指数|構成|平均|あたり/.test(l)))continue;
     cols.push({j,labels})}
   if(!cols.length)return null;
@@ -583,7 +590,7 @@ function rowsToRecords(rows,fbT){
 }
 function buildSource(recs,label,kind){
   if(!recs.length)throw new Error("集計できる行がありません（地域・年月・数値を確認してください）");
-  for(const r of recs)for(const k in r.dims){const v=z2h(r.dims[k]).replace(/\s+/g,"");r.dims[k]=/^(総数|合計|総計|計|小計)$/.test(v)?"計":v}
+  for(const r of recs)for(const k in r.dims){const v=z2h(r.dims[k]).replace(/\s+/g,"");r.dims[k]=/^(総数|合計|総計|計|小計|全建築物計)$/.test(v)?"計":r.dims[k].trim()}
   const dimNames=[];const dimVals={};
   for(const r of recs)for(const k in r.dims){if(!dimVals[k]){dimVals[k]=[];dimVals[k].set=new Set();dimNames.push(k)}if(!dimVals[k].set.has(r.dims[k])){dimVals[k].set.add(r.dims[k]);dimVals[k].push(r.dims[k])}}
   const dims=dimNames.map(n=>({name:n,values:dimVals[n].slice()}));
@@ -706,7 +713,7 @@ function setSource(src,keepView,fromSave){
   for(const d of SRC.dims){
     let v=saved&&saved.sel&&d.values.includes(saved.sel[d.name])?saved.sel[d.name]:null;
     if(!v&&/工事/.test(d.name))v=d.values.find(x=>x==="新設");
-    if(!v)v=d.values.find(x=>/^(総数|計|合計|総計|全体|総)$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values[0];
+    if(!v)v=d.values.find(x=>/^(総数|計|合計|総計|全体|総)$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values.find(x=>/床面積/.test(x))||d.values[0];
     S.sel[d.name]=v}
   if(saved){S.metric=saved.metric||S.metric;S.trend=saved.trend||S.trend;S.mode=saved.mode||S.mode}
   if(!SRC.months.length&&["month","ytd","ttm"].includes(S.mode))S.mode=SRC.fys.length&&!SRC.annual.length?"fy":"year";
@@ -738,7 +745,7 @@ const GLOSSARY=[
     ["給与住宅","会社・官公署・学校などが、社員・職員・教員などを住まわせるために建てる住宅です。社宅・公務員宿舎などです。"],
     ["分譲住宅","建て売りや分譲を目的に建てる住宅です。分譲マンションと分譲一戸建て（建売住宅）が含まれます。"],
     ["計","上の4つの合計です。"]]},
-  {re:/構造/,title:"構造",intro:"柱・はり・壁・床など、建物の主要な部分が何でできているかによる区分です。",items:[
+  {re:/構造/,title:"構造",intro:"柱・はり・壁・床など、建物の主要な部分が何でできているかによる区分です（住宅・建築物共通）。",items:[
     ["木造","主要な部分が木でできているものです。在来工法（軸組工法）、ツーバイフォー工法などがあります。"],
     ["鉄骨鉄筋コンクリート造（SRC造）","鉄骨の周りに鉄筋を組み、コンクリートを打ち込んだものです。高層のマンションなどに使われます。"],
     ["鉄筋コンクリート造（RC造）","鉄筋を組んだ型枠にコンクリートを打ち込んだものです。中高層のマンションに多い構造です。"],
@@ -746,6 +753,21 @@ const GLOSSARY=[
     ["コンクリートブロック造","コンクリートブロックを積み、鉄筋で補強したものです。"],
     ["その他","上のいずれにも当たらない構造です。"],
     ["計","すべての構造の合計です。"]]},
+  {re:/建築主/,title:"建築主",intro:"建物を建てる人・組織（工事の発注者）による区分です。",items:[
+    ["国","国の機関が建てるものです。"],
+    ["都道府県","都道府県が建てるものです（県庁舎、県立学校、県営住宅など）。"],
+    ["市区町村","市区町村が建てるものです（市役所、小中学校、公営住宅など）。"],
+    ["会社","株式会社などの会社が建てるものです。事業用の建物や分譲・賃貸用の住宅などです。"],
+    ["会社でない団体","学校法人、医療法人、社会福祉法人、宗教法人、組合など、会社以外の団体が建てるものです。"],
+    ["個人","個人が建てるものです。自宅の新築や個人経営のアパートなどが多く含まれます。"],
+    ["計","すべての建築主の合計です。"]]},
+  {re:/用途/,title:"用途（大分類）",intro:"建物を何に使うかによる区分です。1つの建物に複数の用途があるときは床面積の割合で振り分けているため、各用途を足しても計と一致しないことがあります。",items:[
+    ["A 居住専用住宅","住むためだけの住宅です。"],
+    ["B 居住専用準住宅","寄宿舎や下宿など、住まいとして使う住宅以外の建物です。"],
+    ["C 居住産業併用建築物","店舗付き住宅など、住まいと事業の両方に使う建物です。"],
+    ["D〜Q 産業別の建築物","農林水産業、製造業、運輸業、卸売・小売業、宿泊・飲食、医療・福祉、公務など、使う産業ごとの建物です。工場は製造業用、倉庫は運輸業用や卸売・小売業用などに入ります。"],
+    ["R 他に分類されない建築物","上のどれにも当たらない建物です。"],
+    ["計","全建築物の合計です。"]]},
   {re:/建て方/,title:"建て方",intro:"1棟の中で住宅がどう配置されているかによる区分です。",items:[
     ["一戸建","1棟に1戸の住宅です。"],
     ["長屋建","2戸以上の住宅を1棟に建て、廊下や階段などを共用せずに、それぞれが直接外に出入りできるものです。テラスハウスなどです。"],
@@ -1103,9 +1125,9 @@ function unpackSource(p){
 }
 const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
 function showSaved(msg){$("saveInfo").textContent=msg}
-const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）"};
+const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）","表5":"表5 建築物 都道府県別・建築主別","表6-1":"表6-1 建築物 都道府県別・構造別","表7-1":"表7-1 建築物 都道府県別・用途別"};
 const ID_TABLE={"0003114535":"表15","0003114565":"表16"};
-function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表/);return m?String(+m[1]):null}
+function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表(?:\s*[-－ー―‐]\s*(\d+))?/);return m?String(+m[1])+(m[2]?"-"+(+m[2]):""):null}
 let META={active:null,list:[]};
 async function saveMeta(){try{await IDB.put("meta",META)}catch(e){}renderDsList()}
 async function loadDataset(recs,key,label,kind){
