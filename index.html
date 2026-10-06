@@ -352,14 +352,24 @@ section[id],details[id]{scroll-margin-top:12px}
         <div id="apiSingle" class="controls" hidden>
           <div class="fld"><label for="sdPreset">統計表</label>
             <select id="sdPreset">
-              <option value="0003114535">表15 都道府県別・利用関係別（〜2024年12月）</option>
+              <optgroup label="住宅・月次（〜2024年12月）">
+              <option value="0003114535">表15 都道府県別・利用関係別</option>
               <option value="0003114565">表16 都道府県別・建て方別</option>
-              <option value="0003119736">利用関係・構造・建て方別 戸数（時系列）</option>
-              <option value="0003119735">同上（年次）</option>
+              <option value="0003119736">都道府県別・利用関係・構造・建て方 戸数</option>
+              </optgroup>
+              <optgroup label="建築物・月次（〜2024年12月）">
+              <option value="0003114393">表4 用途別・階数別・構造別（新築、15階までを表4-1として保存、件数大）</option>
+              <option value="0003114340">表5 都道府県別・建築主別</option>
+              </optgroup>
+              <optgroup label="建築物・年次／年度次">
+              <option value="0003114509">表4 用途別・階数別・構造別（年次）</option>
+              <option value="0003117509">表6-1 都道府県別・構造別（年度次）</option>
+              <option value="0003114510">表7-1 都道府県別・用途別（年次）</option>
+              </optgroup>
               <option value="">統計表IDを直接入力</option>
             </select></div>
           <div class="fld"><label for="sdId">統計表ID</label><input id="sdId" type="text" value="0003114535" style="width:9em"></div>
-          <p class="note" style="margin:0">e-Statのデータベース（API）は年1回の更新で、2025年以降の月次はExcelのみの公開です。</p>
+          <p class="note" style="margin:0">e-Statのデータベース（API）は年1回の更新で、月次は2024年12月分までです。2025年以降は「月次Excelをダウンロード」で取得し、「今のデータに追加する」でつなげてください。取得は全国と47都道府県に絞り、ゼロの値は保存しません。</p>
         </div>
         <button class="btn primary" id="apiBtn" type="button">取得</button>
         <div class="status" id="apiStatus"></div>
@@ -611,7 +621,7 @@ function rowsToRecords(rows,fbT){
 function buildSource(recs,label,kind,zfOpt){
   recs=recs.filter(r=>!r._empty||recs.length===1);
   if(!recs.length)throw new Error("集計できる行がありません（地域・年月・数値を確認してください）");
-  for(const r of recs)for(const k in r.dims){const v=z2h(r.dims[k]).replace(/\s+/g,"");r.dims[k]=/^(総数|合計|総計|計|小計|全建築物計)$/.test(v)?"計":r.dims[k].trim()}
+  for(const r of recs){const nd={};for(const k in r.dims){const v=normText(r.dims[k]).trim();const kk=normText(k).replace(/\s+/g,"");nd[kk]=/^(総数|合計|総計|計|小計|全建築物計)$/.test(v.replace(/\s+/g,""))?"計":v}r.dims=nd}
   const dimNames=[];const dimVals={};
   for(const r of recs)for(const k in r.dims){if(!dimVals[k]){dimVals[k]=[];dimVals[k].set=new Set();dimNames.push(k)}if(!dimVals[k].set.has(r.dims[k])){dimVals[k].set.add(r.dims[k]);dimVals[k].push(r.dims[k])}}
   const dims=dimNames.map(n=>({name:n,values:dimVals[n].slice()}));
@@ -635,17 +645,19 @@ function buildSource(recs,label,kind,zfOpt){
     unit:unitOf,get,count:recs.length};
 }
 /* e-Stat API JSON → レコード */
+function normText(x){return z2h(String(x??"")).replace(/（/g,"(").replace(/）/g,")").replace(/[〜~]/g,"～").replace(/，/g,",")}
+function cleanLabel(x){return normText(x).replace(/[Ａ-Ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[\s　]+/g,"").replace(/^([A-Z])(?=[^A-Za-z0-9])/,"$1 ").replace(/^(小計|合計|総計|総数|全建築物計)$/,"計")}
 function estatToRecords(json,fbT){
   const sd=json.GET_STATS_DATA.STATISTICAL_DATA;
   const objs=[].concat(sd.CLASS_INF.CLASS_OBJ);
   const cls={};for(const o of objs){const m=new Map();for(const c of [].concat(o.CLASS))m.set(c["@code"],c["@name"]);cls[o["@id"]]={name:o["@name"],m}}
   const recs=[];
   for(const v of [].concat(sd.DATA_INF.VALUE||[])){
-    const val=parseNum(v["$"]);if(val===undefined)continue;
+    const val=parseNum(v["$"]);if(val===undefined||val===null||val===0)continue;
     const t=(v["@time"]!==undefined&&parseTime(cls.time?cls.time.m.get(v["@time"]):"",v["@time"]))||fbT;if(!t)continue;
     const pref=v["@area"]!==undefined&&cls.area?matchPref(cls.area.m.get(v["@area"])):0;if(pref===null)continue;
-    const dims={};for(const k in v){if(!k.startsWith("@")||k==="@area"||k==="@time"||k==="@unit")continue;const id=k.slice(1);if(cls[id])dims[cls[id].name]=cls[id].m.get(v[k])??v[k]}
-    recs.push({dims,pref,t,v:val,unit:v["@unit"]||""})}
+    const dims={};for(const k in v){if(!k.startsWith("@")||k==="@area"||k==="@time"||k==="@unit")continue;const id=k.slice(1);if(cls[id])dims[cleanLabel(cls[id].name)]=cleanLabel(cls[id].m.get(v[k])??v[k])}
+    recs.push({dims,pref,t,v:val,unit:v["@unit"]||"",sparse:1})}
   return {recs,title:sd.TABLE_INF&&sd.TABLE_INF.TITLE?(sd.TABLE_INF.TITLE["$"]||sd.TABLE_INF.TITLE):"",next:sd.RESULT_INF&&sd.RESULT_INF.NEXT_KEY};
 }
 
@@ -1089,22 +1101,22 @@ async function findFamilies(){
     const sdm=String(t.SURVEY_DATE??"").match(/(\d{4})(\d{2})/);const sd=sdm&&+sdm[2]>=1&&+sdm[2]<=12?sdm:[null,"0000","00"];
     const title=t.TITLE&&typeof t.TITLE==="object"?((t.TITLE["@no"]?t.TITLE["@no"]+" ":"")+txt(t.TITLE)):txt(t.TITLE);
     const key=txt(t.STATISTICS_NAME).replace(/(令和|平成)?\s*\d{1,4}\s*年(\s*\d{1,2}\s*月)?(分)?/g,"").replace(/\s+/g," ").trim()+"｜"+title.replace(/\s+/g," ").trim();
-    if(!fam.has(key))fam.set(key,{key,title,stat:txt(t.STATISTICS_NAME),items:new Map()});
+    if(!fam.has(key))fam.set(key,{key,title,stat:txt(t.STATISTICS_NAME),cycle:txt(t.CYCLE),items:new Map()});
     const f=fam.get(key);const ymk=ym(sd[1],+sd[2]);
     const prev=f.items.get(ymk);if(!prev||String(t["@id"])>prev)f.items.set(ymk,String(t["@id"]))}
   FAMS=[...fam.values()].sort((x,y)=>(/都道府県/.test(y.title)-/都道府県/.test(x.title))||y.items.size-x.items.size);
   if(!FAMS.length)throw new Error(`統計表が見つかりませんでした（検索結果${tabs.length}件）。検索語を変えてください。`);
-  $("famSel").innerHTML=FAMS.map((f,i)=>{const ks=[...f.items.keys()].sort();return `<option value="${i}">${esc(f.title)}${ks.length>1?`（${ks[0].replace("-","年")}月〜${ks[ks.length-1].replace("-","年")}月・${ks.length}表）`:`（ID ${[...f.items.values()][0]}）`}</option>`}).join("");
+  $("famSel").innerHTML=FAMS.map((f,i)=>{const ks=[...f.items.keys()].sort();return `<option value="${i}">${esc(f.title)}${ks.length>1?`（${ks[0].replace("-","年")}月〜${ks[ks.length-1].replace("-","年")}月・${ks.length}表）`:`（${esc(f.cycle||"")} ID ${[...f.items.values()][0]}）`}</option>`}).join("");
   $("famWrap").hidden=false;
   st.textContent=`${FAMS.length}種類の統計表が見つかりました。表を選んで「取得」を押してください。`;
 }
 $("findBtn").addEventListener("click",async()=>{$("findBtn").disabled=true;try{await findFamilies()}catch(e){apiErr(e)}finally{$("findBtn").disabled=false}});
 async function fetchTable(a,id,q,fbT,onPage){
-  let start=1,all=[],title="";
-  for(let page=0;page<50;page++){
+  let start=1,all=[],title="",read=0;
+  for(let page=0;page<200;page++){
     const root=await getJ("getStatsData",`${a}&statsDataId=${id}&metaGetFlg=Y&cntGetFlg=N&sectionHeaderFlg=2&startPosition=${start}${q||""}`);
     if(!root.STATISTICAL_DATA||!root.STATISTICAL_DATA.DATA_INF)break;
-    const o=estatToRecords({GET_STATS_DATA:root},fbT);all=all.concat(o.recs);title=title||txt(o.title);onPage&&onPage(all.length);
+    const o=estatToRecords({GET_STATS_DATA:root},fbT);for(const x of o.recs)all.push(x);title=title||txt(o.title);read+=[].concat(root.STATISTICAL_DATA.DATA_INF.VALUE||[]).length;onPage&&onPage(all.length,read);
     if(!o.next)break;start=o.next}
   return {recs:all,title};
 }
@@ -1122,12 +1134,22 @@ $("apiBtn").addEventListener("click",async()=>{
         st.textContent=`取得中… ${months[i].replace("-","年")}月（${i+1}/${months.length}表）`;
         const r=await fetchTable(a,f.items.get(months[i]),"",months[i]);
         all=all.concat(r.recs)}
-      const mno=f.title.match(/^\s*(\d+)\s/);
+      const mno=f.title.match(/^\s*(\d+(?:-\d+)?)\s/);
       await loadDataset(all,mno?"表"+mno[1]:"e-Stat "+f.title,`e-Stat ${f.title}`,"api");
       st.textContent=`取得しました（${months.length}か月分・${nf.format(all.length)}件）。`;
     }else await fetchSingle(a,fromY);
   }catch(e){apiErr(e)}finally{$("apiBtn").disabled=false}
 });
+let BIG_OK="";
+// e-StatのDB版の表4（全階数）を、Excelの表4-1（15階まで）と同じ範囲にそろえ、計を作り直す
+function to41(recs){
+  const keep=["1階","2階","3階","4～5階","6～9階","10～15階"];const fk=Object.keys((recs[0]||{}).dims||{}).find(k=>/階数/.test(normText(k)));if(!fk)return recs;
+  const out=[],sum=new Map();
+  for(const r of recs){const f=normText(r.dims[fk]).replace(/\s+/g,"");if(!keep.includes(f))continue;
+    const d={...r.dims,[fk]:f};out.push({...r,dims:d});
+    const dd={...r.dims,[fk]:"計"};const k=JSON.stringify([dd,r.pref,r.t,r.unit]);const o=sum.get(k);if(o)o.v+=r.v;else sum.set(k,{dims:dd,pref:r.pref,t:r.t,unit:r.unit,v:r.v,sparse:1})}
+  return out.concat([...sum.values()]);
+}
 async function fetchSingle(a,fromY){
       const st=$("apiStatus");const id=$("sdId").value.trim();
       if(!/^\d{10}$/.test(id))throw new Error("統計表IDは10桁の数字です。");
@@ -1136,8 +1158,16 @@ async function fetchSingle(a,fromY){
       const objs=[].concat(mr.METADATA_INF.CLASS_INF.CLASS_OBJ);const to=objs.find(o=>o["@id"]==="time");
       let q="";
       if(to){const codes=[].concat(to.CLASS).filter(c=>{const t=parseTime(c["@name"],c["@code"]);return t&&+t.replace("FY","").slice(0,4)>=fromY-1}).map(c=>c["@code"]).sort();if(codes.length)q=`&cdTimeFrom=${codes[0]}`}
-      const r=await fetchTable(a,id,q,null,n=>st.textContent=`データを取得中…（${nf.format(n)}件）`);
-      const recs=r.recs.filter(x=>+x.t.replace("FY","").slice(0,4)>=fromY-1);
+      const ao=objs.find(o=>o["@id"]==="area");
+      if(ao){const codes=[].concat(ao.CLASS).filter(c=>matchPref(c["@name"])!==null).map(c=>c["@code"]);if(codes.length&&codes.length<[].concat(ao.CLASS).length)q+=`&cdArea=${codes.join(",")}`}
+      st.textContent="データの件数を確認中…";
+      let total=0;try{const c=await getJ("getStatsData",`${a}&statsDataId=${id}&cntGetFlg=Y${q}`);total=+(c.STATISTICAL_DATA&&c.STATISTICAL_DATA.RESULT_INF&&c.STATISTICAL_DATA.RESULT_INF.TOTAL_NUMBER||0)}catch(e){}
+      const key=id+"|"+q;
+      if(total>800000&&BIG_OK!==key){BIG_OK=key;st.className="status err";
+        st.textContent=`この表は開始年以降で約${nf.format(total)}件あり、取得に数分かかります（${Math.ceil(total/100000)}回に分けて取得）。続けるにはもう一度「取得」を押してください。開始年を遅くすると件数が減ります。`;return}
+      const r=await fetchTable(a,id,q,null,(n,read)=>st.textContent=`データを取得中…（${nf.format(read)}${total?" / "+nf.format(total):""}件を確認、ゼロ以外 ${nf.format(n)}件）`);
+      let recs=r.recs.filter(x=>+x.t.replace("FY","").slice(0,4)>=fromY-1);
+      if(id==="0003114393")recs=to41(recs);
       if(!recs.length)throw new Error("開始年以降のデータがこの統計表にありません。「月次表を集める」を使ってください。");
       await loadDataset(recs,ID_TABLE[id]||"e-Stat "+id,`e-Stat ${id} ${r.title}`,"api");
       const last=[...new Set(recs.map(x=>x.t))].sort().pop();
@@ -1220,8 +1250,8 @@ function unpackSource(p){
 }
 const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
 function showSaved(msg){$("saveInfo").textContent=msg}
-const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）","表5":"表5 建築物 都道府県別・建築主別","表6-1":"表6-1 建築物 都道府県別・構造別","表7-1":"表7-1 建築物 都道府県別・用途別","表4-1":"表4-1 建築物 都道府県別・用途別・階数別・構造別（新築）"};
-const ID_TABLE={"0003114535":"表15","0003114565":"表16"};
+const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）","表5":"表5 建築物 都道府県別・建築主別","表6-1":"表6-1 建築物 都道府県別・構造別","表7-1":"表7-1 建築物 都道府県別・用途別","表4-1":"表4-1 建築物 都道府県別・用途別・階数別・構造別（新築）","表4":"表4 建築物 用途別・階数別・構造別（新築・全階数）","表4（年次）":"表4 建築物 用途別・階数別・構造別（年次）","表6-1（年度次）":"表6-1 建築物 都道府県別・構造別（年度次）","表7-1（年次）":"表7-1 建築物 都道府県別・用途別（年次）"};
+const ID_TABLE={"0003114535":"表15","0003114565":"表16","0003119736":"表18","0003114393":"表4-1","0003114340":"表5","0003114509":"表4（年次）","0003117509":"表6-1（年度次）","0003114510":"表7-1（年次）"};
 function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表(?:\s*[-－ー―‐]\s*(\d+))?/);return m?String(+m[1])+(m[2]?"-"+(+m[2]):""):null}
 let META={active:null,list:[]};
 async function saveMeta(){try{await IDB.put("meta",META)}catch(e){}renderDsList()}
