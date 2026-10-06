@@ -137,6 +137,21 @@ details.data[open]>summary::after{content:"－"}
 .status{font-size:12.5px;min-height:1.4em}
 .status.err{color:var(--u4)}
 a{color:var(--accent)}
+.help{display:inline-grid;place-items:center;width:20px;height:20px;margin-left:6px;border-radius:50%;border:1px solid var(--muted);background:var(--surface);color:var(--muted);font:700 12px/1 var(--f-body);cursor:pointer;vertical-align:middle;padding:0}
+.help:hover{color:var(--ink);border-color:var(--ink)}
+.fld .lblrow{display:flex;align-items:center;font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:700}
+@media (max-width:700px){.help{width:26px;height:26px;font-size:14px}}
+dialog.gloss{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(560px,calc(100vw - 32px));max-height:min(80vh,640px);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+dialog.gloss::backdrop{background:rgba(10,16,14,.45)}
+.gloss .gh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+.gloss h3{margin:0;font-size:16px}
+.gloss .gb{padding:12px 16px 18px;overflow:auto;display:grid;gap:10px}
+.gloss .gb>p{margin:0;font-size:13px;color:var(--muted)}
+.gloss dl{margin:0;display:grid;gap:10px}
+.gloss dt{font-weight:700;font-size:14px}
+.gloss dd{margin:2px 0 0;font-size:13.5px;line-height:1.65}
+.gloss .x{font:inherit;font-size:20px;line-height:1;background:none;border:0;color:var(--muted);cursor:pointer;width:36px;height:36px;border-radius:50%}
+.gloss .x:hover{background:var(--sunk);color:var(--ink)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion: reduce){#map path{transition:none}}
 section[id],details[id]{scroll-margin-top:12px}
@@ -254,7 +269,7 @@ section[id],details[id]{scroll-margin-top:12px}
       <p class="note" id="trendNote" style="margin:6px 0 0"></p>
     </section>
     <section class="panel" id="secBd">
-      <h2><span>内訳 <b id="bdArea">全国</b></span><select id="bdDim" aria-label="内訳の切り口"></select></h2>
+      <h2><span>内訳 <b id="bdArea">全国</b></span><span class="row" style="gap:4px;align-items:center"><select id="bdDim" aria-label="内訳の切り口"></select><button type="button" class="help" id="bdHelp" aria-label="内訳の区分の説明">?</button></span></h2>
       <div class="list" id="bdList"></div>
     </section>
     <section class="panel">
@@ -262,6 +277,11 @@ section[id],details[id]{scroll-margin-top:12px}
       <div class="list" id="regList"></div>
     </section>
   </div>
+
+  <dialog class="gloss" id="gloss" aria-labelledby="glossT">
+    <div class="gh"><h3 id="glossT"></h3><button type="button" class="x" id="glossX" aria-label="閉じる">×</button></div>
+    <div class="gb" id="glossB"></div>
+  </dialog>
 
   <nav class="tabbar" id="tabbar" aria-label="セクション移動">
     <button type="button" data-t="secCond"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>条件</button>
@@ -683,8 +703,43 @@ function setSource(src,keepView,fromSave){
   $("srcDetail").innerHTML=`<b>${esc(SRC.label)}</b><br>期間：${esc(range)}<br>区分：${SRC.dims.map(d=>esc(d.name)+"（"+d.values.length+"）").join("、")||"なし"}<br>データ件数：${nf.format(SRC.count)}`;
   render();
 }
+const GLOSSARY=[
+  {re:/工事/,title:"工事別",intro:"住宅を着工したときの工事の種類による区分です。国交省が毎月発表する「新設住宅着工戸数」は「新設」の数字です。",items:[
+    ["計","新設とその他の合計です。"],
+    ["新設","新築・増築・改築によって、住宅の戸が新たに造られる工事です。一般に住宅着工戸数というときはこれを指します。"],
+    ["その他","増築・改築のうち、住宅の戸数が増えないものです（既存住宅の増改築など）。"]]},
+  {re:/利用関係/,title:"利用関係",intro:"建てた住宅を誰がどう使うかによる区分です。",items:[
+    ["持家（もちいえ）","建築主が自分で住むために建てる住宅です。注文住宅の多くが該当します。"],
+    ["貸家（かしや）","建築主が人に貸すために建てる住宅です。賃貸アパート・賃貸マンションなどです。"],
+    ["給与住宅","会社・官公署・学校などが、社員・職員・教員などを住まわせるために建てる住宅です。社宅・公務員宿舎などです。"],
+    ["分譲住宅","建て売りや分譲を目的に建てる住宅です。分譲マンションと分譲一戸建て（建売住宅）が含まれます。"],
+    ["計","上の4つの合計です。"]]},
+  {re:/構造/,title:"構造",intro:"柱・はり・壁・床など、建物の主要な部分が何でできているかによる区分です。",items:[
+    ["木造","主要な部分が木でできているものです。在来工法（軸組工法）、ツーバイフォー工法などがあります。"],
+    ["鉄骨鉄筋コンクリート造（SRC造）","鉄骨の周りに鉄筋を組み、コンクリートを打ち込んだものです。高層のマンションなどに使われます。"],
+    ["鉄筋コンクリート造（RC造）","鉄筋を組んだ型枠にコンクリートを打ち込んだものです。中高層のマンションに多い構造です。"],
+    ["鉄骨造（S造）","主要な部分が鉄骨でできているものです。軽量鉄骨のプレハブ住宅や低層の共同住宅などに使われます。"],
+    ["コンクリートブロック造","コンクリートブロックを積み、鉄筋で補強したものです。"],
+    ["その他","上のいずれにも当たらない構造です。"],
+    ["計","すべての構造の合計です。"]]},
+  {re:/建て方/,title:"建て方",intro:"1棟の中で住宅がどう配置されているかによる区分です。",items:[
+    ["一戸建","1棟に1戸の住宅です。"],
+    ["長屋建","2戸以上の住宅を1棟に建て、廊下や階段などを共用せずに、それぞれが直接外に出入りできるものです。テラスハウスなどです。"],
+    ["共同住宅","1棟に2戸以上の住宅があり、廊下・階段などを共用するものです。アパート・マンションなどです。"]]}
+];
+const glossFor=name=>GLOSSARY.find(g=>g.re.test(name));
+function openGloss(name){
+  const g=glossFor(name);if(!g)return;const dl=$("gloss");
+  $("glossT").textContent=g.title;
+  $("glossB").innerHTML=`<p>${esc(g.intro)}</p><dl>${g.items.map(([t,d])=>`<div><dt>${esc(t)}</dt><dd>${esc(d)}</dd></div>`).join("")}</dl><p>出典：国土交通省「建築着工統計調査」の用語の定義を、分かりやすく言い換えています。</p>`;
+  try{dl.showModal()}catch(e){dl.setAttribute("open","")}
+  $("glossX").focus();
+}
+$("glossX").addEventListener("click",()=>$("gloss").close?$("gloss").close():$("gloss").removeAttribute("open"));
+$("gloss").addEventListener("click",e=>{if(e.target===$("gloss"))$("gloss").close()});
+document.addEventListener("click",e=>{const b=e.target.closest(".help");if(b)openGloss(b.dataset.term)});
 function buildDims(){
-  $("dims").innerHTML=SRC.dims.map((d,i)=>`<div class="fld"><label for="dim${i}">${esc(d.name)}</label><select id="dim${i}" data-dim="${esc(d.name)}"${d.values.length<2?" disabled":""}>${d.values.map(v=>`<option${v===S.sel[d.name]?" selected":""}>${esc(v)}</option>`).join("")}</select></div>`).join("");
+  $("dims").innerHTML=SRC.dims.map((d,i)=>`<div class="fld"><span class="lblrow"><label for="dim${i}">${esc(d.name)}</label>${glossFor(d.name)?`<button type="button" class="help" data-term="${esc(d.name)}" aria-label="${esc(d.name)}の説明">?</button>`:""}</span><select id="dim${i}" data-dim="${esc(d.name)}"${d.values.length<2?" disabled":""}>${d.values.map(v=>`<option${v===S.sel[d.name]?" selected":""}>${esc(v)}</option>`).join("")}</select></div>`).join("");
 }
 function buildYears(){
   const ys=allYears();$("ySel").innerHTML=ys.map(y=>`<option value="${y}">${y}年</option>`).join("");
@@ -798,6 +853,7 @@ function renderBreakdown(unit){
   const items=d.values.map(v=>{const sel={...S.sel,[d.name]:v};const k=selKey(sel);return {name:v,...agg(k,S.area,S.mode,S.Y,S.M),u:SRC.unit(k)}});
   const tot=/総数|^計$|合計|総計/.test(d.values[0]);
   $("bdList").innerHTML=listRows(items,items[0].u||unit,tot);
+  $("bdHelp").dataset.term=d.name;$("bdHelp").hidden=!glossFor(d.name);
 }
 function renderRegions(sel,unit){
   $("regList").innerHTML=listRows(REGIONS.map(([n,ids])=>({name:n,...aggRegion(sel,ids)})),unit,false);
