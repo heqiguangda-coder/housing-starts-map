@@ -356,6 +356,7 @@ section[id],details[id]{scroll-margin-top:12px}
             <select id="xTab">
               <option value="15">表15 都道府県別・利用関係別</option>
               <option value="16">表16 都道府県別・建て方別</option>
+              <option value="18">表18 都道府県別・構造別・建て方別（新設）</option>
             </select></div>
           <div class="fld"><label for="xFrom">開始年</label><input id="xFrom" type="number" value="2025" min="2000" max="2100" style="width:6em"></div>
           <button class="btn" id="xFind" type="button">ファイルを探す</button>
@@ -480,6 +481,9 @@ function matrixToRecords(rows,fbT){
   const t=fbT||findYM(rows.slice(0,Math.max(first,1)).map(r=>r.join(" ")).join(" "));
   if(!t)throw new Error("表の年月が分かりません（ファイル名か表の上部に「2026年8月」などの表記が必要です）");
   const cell=(r,j)=>z2h(String(r[j]??"")).replace(/\s+/g,"").trim();
+  const numCount=r=>{let n=0;for(let j=areaCol+1;j<ncol;j++)if(isNumericCell(r[j]))n++;return n};
+  const prefHeads=rows.slice(first).filter(r=>matchPref(r[areaCol])!==null).slice(0,48);
+  const blockMode=prefHeads.length>=20&&prefHeads.filter(r=>numCount(r)===0).length>=prefHeads.length*.8;
   // 見出し行：データ直前の、地域列より右に2つ以上の値がある行
   const hdr=rows.slice(Math.max(0,first-8),first).filter(r=>{let n=0;for(let j=areaCol+1;j<ncol;j++)if(cell(r,j))n++;return n>=2});
   // 上位の見出しが変わる所で下位の繰り返し（結合セル）を切る
@@ -489,12 +493,23 @@ function matrixToRecords(rows,fbT){
     const v=cell(r,j);
     if(ff.slice(0,li).some(up=>cell(hdr[ff.indexOf(up)],j)))last="";
     if(v)last=v;return last}))});
+  let rowDim="区分";
+  if(blockMode&&hdr.length){const last=hdr[hdr.length-1];for(let j=0;j<=areaCol;j++)if(cell(last,j))rowDim=cell(last,j)}
   const lvName=hdr.map((r,i)=>{
     let lab="";for(let j=0;j<=areaCol;j++)if(cell(r,j)){lab=cell(r,j)}
+    if(blockMode&&i===hdr.length-1)lab="";
     if(lab&&!/都道府県|地域|市区町村/.test(lab))return lab;
     const txt=ff[i].join("|");for(const [re,n] of LEVEL_NAMES)if(re.test(txt))return n;return "区分"+(i+1)});
   // 同じ地域が再び現れたら（市部計・郡部計などの別表）そこで打ち切る
   const seen=new Set();const dataRows=[];
+  if(blockMode){ // 地域の見出し行の下に、区分（利用関係など）の行が続く形
+    let cur=null;
+    for(const r of rows.slice(first)){
+      if(numCount(r)===0){const lab=cell(r,areaCol);if(!lab)continue;const p=matchPref(lab);cur=p!==null&&!seen.has(p)?p:null;if(cur!==null)seen.add(cur);continue}
+      if(cur===null)continue;
+      const rv=cell(r,areaCol).replace(/^(小計|合計|総計|総数)$/,"計");if(!rv)continue;
+      dataRows.push(Object.assign(r.slice(),{_p:cur,_rv:rv}))}
+  }else
   for(const r of rows.slice(first)){const p=matchPref(r[areaCol]);if(p===null)continue;if(seen.has(p))break;seen.add(p);dataRows.push(r)}
   const cols=[];
   for(let j=0;j<ncol;j++){if(j===areaCol)continue;
@@ -505,9 +520,9 @@ function matrixToRecords(rows,fbT){
   if(!cols.length)return null;
   const used=lvName.map((n,i)=>new Set(cols.map(c=>c.labels[i])).size>1);
   const recs=[];
-  for(const r of dataRows){const pref=matchPref(r[areaCol]);
+  for(const r of dataRows){const pref=blockMode?r._p:matchPref(r[areaCol]);
     for(const c of cols){const v=parseNum(r[c.j]);if(v===undefined||v===null)continue;
-      const dims={};let unit="";lvName.forEach((n,i)=>{if(!used[i])return;let l=c.labels[i];const m=l.match(/^(.*?)[（(]([^）)]+)[）)]$/);if(m){l=m[1];unit=m[2]}dims[n]=l});
+      const dims={};let unit="";if(blockMode)dims[rowDim]=r._rv;lvName.forEach((n,i)=>{if(!used[i])return;let l=c.labels[i];const m=l.match(/^(.*?)[（(]([^）)]+)[）)]$/);if(m){l=m[1];unit=m[2]}dims[n]=l});
       recs.push({dims,pref,t,v,unit})}}
   return recs;
 }
@@ -1026,7 +1041,6 @@ function catalogFiles(root,tabNo){
       const fmt=txt(r.FORMAT).toUpperCase();if(fmt&&!/XLS/.test(fmt))continue;
       const T=r.TITLE||{};const no=z2h(txt(T.TABLE_NO)).trim();const name=txt(T.TABLE_NAME)||txt(T.NAME);
       if(no!==tabNo&&!(no===""&&new RegExp("(^|表)"+tabNo+"[^0-9-]").test(name)))continue;
-      if(!/都道府県/.test(name+txt(T.NAME)))continue;
       const all=dsTxt+JSON.stringify(r);
       let t=null;const sd=all.match(/"SURVEY_DATE"\s*:\s*"?(\d{4})(\d{2})/);
       if(sd&&+sd[2]>=1&&+sd[2]<=12)t=ym(sd[1],+sd[2]);
@@ -1089,7 +1103,7 @@ function unpackSource(p){
 }
 const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
 function showSaved(msg){$("saveInfo").textContent=msg}
-const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別"};
+const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）"};
 const ID_TABLE={"0003114535":"表15","0003114565":"表16"};
 function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表/);return m?String(+m[1]):null}
 let META={active:null,list:[]};
