@@ -38,7 +38,7 @@
   --nodata:#2a312e; --mapline:#111715; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;font-variant-numeric:tabular-nums}
-.wrap{max-width:1320px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:16px}
+.wrap{overflow-x:clip;max-width:1320px;margin:0 auto;padding-inline:16px;padding-block:20px 48px;display:grid;gap:16px}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;border-bottom:2px solid var(--ink);padding-bottom:12px}
 h1{font-family:var(--f-display);font-size:clamp(22px,3.2vw,30px);line-height:1.2;margin:0;letter-spacing:.04em;text-wrap:balance}
 .sub{color:var(--muted);font-size:13px;margin:4px 0 0}
@@ -48,9 +48,9 @@ h1{font-family:var(--f-display);font-size:clamp(22px,3.2vw,30px);line-height:1.2
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;min-width:0}
 .panel h2{font-size:13px;letter-spacing:.08em;margin:0 0 10px;color:var(--muted);font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .panel h2 b{color:var(--ink);letter-spacing:.02em;font-size:14px}
-.controls{display:grid;gap:12px}
+.controls{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
 .row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:flex-end}
-.fld{display:grid;gap:3px;min-width:0}
+.fld{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0;max-width:100%}
 .fld label,.lbl{font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:700}
 select,input[type=text],input[type=number]{font:inherit;font-size:14px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0;max-width:100%}
 select:focus-visible,input:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
@@ -123,7 +123,8 @@ details.data>summary::after{content:"＋";color:var(--muted)}
 details.data[open]>summary::after{content:"－"}
 .datagrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;padding:0 16px 16px}
 @media (max-width:900px){.datagrid{grid-template-columns:minmax(0,1fr)}}
-.datagrid section{display:grid;gap:8px;align-content:start;min-width:0}
+.datagrid section{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-content:start;min-width:0;overflow-wrap:anywhere}
+.datagrid select{width:100%}
 .datagrid h3{margin:0;font-size:14px}
 .datagrid p,.datagrid ol{margin:0;font-size:13px;color:var(--muted)}
 .datagrid ol{padding-left:1.3em}
@@ -309,9 +310,9 @@ section[id],details[id]{scroll-margin-top:12px}
         <div id="apiSingle" class="controls" hidden>
           <div class="fld"><label for="sdPreset">統計表</label>
             <select id="sdPreset">
-              <option value="0003114535">表15 都道府県別、工事別、利用関係別（月次・2024年12月まで）</option>
-              <option value="0003114565">表16 都道府県別、工事別、住宅の種類別、建て方別（月次）</option>
-              <option value="0003119736">【住宅】利用関係別 構造別 建て方別 都道府県別 戸数（時系列）</option>
+              <option value="0003114535">表15 都道府県別・利用関係別（〜2024年12月）</option>
+              <option value="0003114565">表16 都道府県別・建て方別</option>
+              <option value="0003119736">利用関係・構造・建て方別 戸数（時系列）</option>
               <option value="0003119735">同上（年次）</option>
               <option value="">統計表IDを直接入力</option>
             </select></div>
@@ -327,8 +328,8 @@ section[id],details[id]{scroll-margin-top:12px}
         <div class="row">
           <div class="fld"><label for="xTab">表</label>
             <select id="xTab">
-              <option value="15">表15 都道府県別、工事別、利用関係別</option>
-              <option value="16">表16 都道府県別、工事別、住宅の種類別、建て方別</option>
+              <option value="15">表15 都道府県別・利用関係別</option>
+              <option value="16">表16 都道府県別・建て方別</option>
             </select></div>
           <div class="fld"><label for="xFrom">開始年</label><input id="xFrom" type="number" value="2025" min="2000" max="2100" style="width:6em"></div>
           <button class="btn" id="xFind" type="button">ファイルを探す</button>
@@ -868,7 +869,7 @@ async function findFamilies(){
   const {a,fromY}=apiArgs();const now=new Date();
   st.textContent="統計表を検索中…";
   const kw=$("kw").value.trim();
-  const root=await getJ("getStatsList",`${a}&statsCode=00600120&surveyYears=${fromY-1}01-${now.getFullYear()}12&limit=5000${kw?"&searchWord="+encodeURIComponent(kw):""}`);
+  const root=await getJ("getStatsList",`${a}&statsCode=00600120&surveyYears=${fromY-1}01-${now.getFullYear()}12${kw?"&searchWord="+encodeURIComponent(kw):""}`);
   const tabs=[].concat(root.DATALIST_INF&&root.DATALIST_INF.TABLE_INF||[]);
   const fam=new Map();
   for(const t of tabs){
@@ -887,8 +888,8 @@ async function findFamilies(){
 $("findBtn").addEventListener("click",async()=>{$("findBtn").disabled=true;try{await findFamilies()}catch(e){apiErr(e)}finally{$("findBtn").disabled=false}});
 async function fetchTable(a,id,q,fbT,onPage){
   let start=1,all=[],title="";
-  for(let page=0;page<30;page++){
-    const root=await getJ("getStatsData",`${a}&statsDataId=${id}&metaGetFlg=Y&cntGetFlg=N&sectionHeaderFlg=2&limit=100000&startPosition=${start}${q||""}`);
+  for(let page=0;page<50;page++){
+    const root=await getJ("getStatsData",`${a}&statsDataId=${id}&metaGetFlg=Y&cntGetFlg=N&sectionHeaderFlg=2&startPosition=${start}${q||""}`);
     if(!root.STATISTICAL_DATA||!root.STATISTICAL_DATA.DATA_INF)break;
     const o=estatToRecords({GET_STATS_DATA:root},fbT);all=all.concat(o.recs);title=title||txt(o.title);onPage&&onPage(all.length);
     if(!o.next)break;start=o.next}
@@ -955,7 +956,7 @@ $("xFind").addEventListener("click",async()=>{
   try{
     const {a}=apiArgs();const from=+$("xFrom").value||2025;const now=new Date();const no=$("xTab").value;
     st.textContent="e-Statでファイルを探しています…";
-    const root=await getJ("getDataCatalog",`${a}&statsCode=00600120&surveyYears=${from-1}01-${now.getFullYear()}12&dataType=XLS&limit=5000&searchWord=${encodeURIComponent("都道府県別")}`);
+    const root=await getJ("getDataCatalog",`${a}&statsCode=00600120&surveyYears=${from-1}01-${now.getFullYear()}12&dataType=XLS&limit=100&searchWord=${encodeURIComponent("都道府県別")}`);
     XFILES=catalogFiles(root,no).filter(f=>+f.t.slice(0,4)>=from-1);
     if(!XFILES.length)throw new Error("該当するExcelが見つかりませんでした。開始年や表を変えてお試しください。");
     $("xList").innerHTML=XFILES.map(f=>`<a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.t.slice(0,4)}年${+f.t.slice(5)}月</a>`).join("");
