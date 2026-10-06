@@ -157,6 +157,11 @@ dialog.gloss::backdrop{background:rgba(10,16,14,.45)}
 .dsrow.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
 #dsSel{max-width:15em;font-weight:700}
 @media (max-width:700px){header.top .row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center}#dsSel{max-width:100%}}
+.crossbox table{min-width:520px}
+.crossbox td small{display:block;font-size:11px}
+.crossbox th.focus,.crossbox td.focus{background:var(--sunk)}
+.crossbox td.share{font-weight:700}
+@media (max-width:700px){.crossbox{overflow-x:auto!important;border:1px solid var(--line)!important}.crossbox table{min-width:560px;font-size:12.5px}#crRow,#crCol,#crFocus{width:auto;min-height:36px;font-size:14px}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 @media (prefers-reduced-motion: reduce){#map path{transition:none}}
 section[id],details[id]{scroll-margin-top:12px}
@@ -237,6 +242,7 @@ section[id],details[id]{scroll-margin-top:12px}
           <button type="button" data-v="yoy">前年同期比</button>
           <button type="button" data-v="diff">前年差</button>
           <button type="button" data-v="value">実数</button>
+          <button type="button" data-v="share" id="shareBtn">構成比</button>
         </div>
       </div>
     </div>
@@ -247,8 +253,8 @@ section[id],details[id]{scroll-margin-top:12px}
   <section class="kpis" aria-label="全国の要約">
     <div class="kpi"><div class="k" id="kLab1">全国 当期</div><div class="v" id="kCur">—</div><div class="n" id="kCurN"></div></div>
     <div class="kpi"><div class="k">全国 前年同期</div><div class="v" id="kPrev">—</div><div class="n" id="kPrevN"></div></div>
-    <div class="kpi"><div class="k">全国 前年同期比</div><div class="v" id="kYoy">—</div><div class="n" id="kDiff"></div></div>
-    <div class="kpi"><div class="k">都道府県の増減</div><div class="v" id="kCount">—</div><div class="n" id="kCountN"></div></div>
+    <div class="kpi"><div class="k" id="kLab3">全国 前年同期比</div><div class="v" id="kYoy">—</div><div class="n" id="kDiff"></div></div>
+    <div class="kpi"><div class="k" id="kLab4">都道府県の増減</div><div class="v" id="kCount">—</div><div class="n" id="kCountN"></div></div>
   </section>
 
   <div class="grid2">
@@ -263,7 +269,7 @@ section[id],details[id]{scroll-margin-top:12px}
     <section class="panel" id="secTable">
       <h2><span>都道府県別一覧</span><span class="row" style="gap:8px"><span class="note" id="unitNote"></span><button class="btn" type="button" id="copyBtn">表をコピー</button></span></h2>
       <div class="tablebox"><table id="tbl"><thead></thead><tbody></tbody></table></div>
-      <p class="note" style="margin:8px 0 0">判定：前年同期比 +10%以上「拡大」／0〜+10%「増加」／−10〜0%「減少」／−10%未満「縮小」。見出しを押すと並べ替えます。</p>
+      <p class="note" style="margin:8px 0 0" id="tblNote">判定：前年同期比 +10%以上「拡大」／0〜+10%「増加」／−10〜0%「減少」／−10%未満「縮小」。見出しを押すと並べ替えます。</p>
     </section>
   </div>
 
@@ -296,6 +302,16 @@ section[id],details[id]{scroll-margin-top:12px}
     <button type="button" data-t="secTrend"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>推移</button>
     <button type="button" data-t="dataPanel"><svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"/></svg>データ</button>
   </nav>
+
+  <section class="panel" id="secCross" hidden>
+    <h2><span>クロス集計 <b id="crossArea">全国</b></span>
+      <span class="row" style="gap:6px;align-items:center">
+        <select id="crRow" aria-label="行の区分"></select><span class="note">×</span><select id="crCol" aria-label="列の区分"></select>
+        <span class="note">構成比</span><select id="crFocus" aria-label="構成比を見る区分"></select>
+      </span></h2>
+    <div class="tablebox crossbox"><table id="crossTbl"></table></div>
+    <p class="note" id="crossNote" style="margin:8px 0 0"></p>
+  </section>
 
   <details class="data" id="dataPanel">
     <summary><span>データの読み込み</span><span class="note" id="dataSummary"></span></summary>
@@ -363,6 +379,7 @@ section[id],details[id]{scroll-margin-top:12px}
               <option value="5">表5 建築物 都道府県別・建築主別</option>
               <option value="6-1">表6-1 建築物 都道府県別・構造別</option>
               <option value="7-1">表7-1 建築物 都道府県別・用途別</option>
+              <option value="4-1">表4-1 建築物 用途別・階数別・構造別（新築・15階まで）</option>
               </optgroup>
             </select></div>
           <div class="fld"><label for="xFrom">開始年</label><input id="xFrom" type="number" value="2025" min="2000" max="2100" style="width:6em"></div>
@@ -489,21 +506,22 @@ function matrixToRecords(rows,fbT){
   if(!t)throw new Error("表の年月が分かりません（ファイル名か表の上部に「2026年8月」などの表記が必要です）");
   const cell=(r,j)=>z2h(String(r[j]??"")).replace(/\s+/g,"").trim();
   const numCount=r=>{let n=0;for(let j=areaCol+1;j<ncol;j++)if(isNumericCell(r[j]))n++;return n};
+  let dataStart=ncol;for(const r of rows.slice(first,first+40))for(let j=areaCol+1;j<ncol;j++)if(isNumericCell(r[j])){dataStart=Math.min(dataStart,j);break}
   const prefHeads=rows.slice(first).filter(r=>matchPref(r[areaCol])!==null).slice(0,48);
   const blockMode=prefHeads.length>=20&&prefHeads.filter(r=>numCount(r)===0).length>=prefHeads.length*.8;
   // 見出し行：データ直前の、地域列より右に2つ以上の値がある行
-  const hdr=rows.slice(Math.max(0,first-8),first).filter(r=>{let n=0;for(let j=areaCol+1;j<ncol;j++)if(cell(r,j))n++;return n>=2});
+  const hdr=rows.slice(Math.max(0,first-8),first).filter(r=>{let n=0;for(let j=dataStart;j<ncol;j++)if(cell(r,j))n++;return n>=2});
   // 上位の見出しが変わる所で下位の繰り返し（結合セル）を切る
   const ff=[];
   hdr.forEach((r,li)=>{let last="";ff.push(Array.from({length:ncol},(_,j)=>{
-    if(j<=areaCol)return "";
+    if(j<dataStart)return "";
     const v=cell(r,j);
     if(ff.slice(0,li).some(up=>cell(hdr[ff.indexOf(up)],j)))last="";
     if(v)last=v;return last}))});
   let rowDim="区分";
-  if(blockMode&&hdr.length){const last=hdr[hdr.length-1];for(let j=0;j<=areaCol;j++)if(cell(last,j))rowDim=cell(last,j)}
+  if(blockMode&&hdr.length){const last=hdr[hdr.length-1];for(let j=0;j<dataStart;j++)if(cell(last,j))rowDim=cell(last,j)}
   const lvName=hdr.map((r,i)=>{
-    let lab="";for(let j=0;j<=areaCol;j++)if(cell(r,j)){lab=cell(r,j)}
+    let lab="";for(let j=0;j<dataStart;j++)if(cell(r,j)){lab=cell(r,j)}
     if(blockMode&&i===hdr.length-1)lab="";
     if(lab&&!/都道府県|地域|市区町村/.test(lab))return lab;
     const txt=ff[i].join("|");for(const [re,n] of LEVEL_NAMES)if(re.test(txt))return n;return "区分"+(i+1)});
@@ -514,7 +532,8 @@ function matrixToRecords(rows,fbT){
     for(const r of rows.slice(first)){
       if(numCount(r)===0){const lab=cell(r,areaCol);if(!lab)continue;const p=matchPref(lab);cur=p!==null&&!seen.has(p)?p:null;if(cur!==null)seen.add(cur);continue}
       if(cur===null)continue;
-      const rv=cell(r,areaCol).replace(/^(小計|合計|総計|総数)$/,"計");if(!rv)continue;
+      let rv="";for(let j=areaCol;j<dataStart;j++)rv+=cell(r,j);
+      rv=rv.replace(/[Ａ-Ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/^([A-Z])(?=[^A-Za-z0-9])/,"$1 ").replace(/^(小計|合計|総計|総数|全建築物計)$/,"計");if(!rv)continue;
       dataRows.push(Object.assign(r.slice(),{_p:cur,_rv:rv}))}
   }else
   for(const r of rows.slice(first)){const p=matchPref(r[areaCol]);if(p===null)continue;if(seen.has(p))break;seen.add(p);dataRows.push(r)}
@@ -528,9 +547,10 @@ function matrixToRecords(rows,fbT){
   const used=lvName.map((n,i)=>new Set(cols.map(c=>c.labels[i])).size>1);
   const recs=[];
   for(const r of dataRows){const pref=blockMode?r._p:matchPref(r[areaCol]);
-    for(const c of cols){const v=parseNum(r[c.j]);if(v===undefined||v===null)continue;
+    for(const c of cols){const v=parseNum(r[c.j]);if(v===undefined||v===null||v===0)continue;
       const dims={};let unit="";if(blockMode)dims[rowDim]=r._rv;lvName.forEach((n,i)=>{if(!used[i])return;let l=c.labels[i];const m=l.match(/^(.*?)[（(]([^）)]+)[）)]$/);if(m){l=m[1];unit=m[2]}dims[n]=l});
-      recs.push({dims,pref,t,v,unit})}}
+      recs.push({dims,pref,t,v,unit,sparse:1})}}
+  if(!recs.length&&dataRows.length)recs.push({dims:{},pref:0,t,v:0,sparse:1,_empty:1});
   return recs;
 }
 function rowsToRecords(rows,fbT){
@@ -588,7 +608,8 @@ function rowsToRecords(rows,fbT){
     let best=-1,bf=0;for(const j of cs){if(/code|コード/i.test(head[j]))continue;const f=frac(j,c=>matchPref(c)!==null);if(f>bf){bf=f;best=j}}
     return bf>.5?best:-1}
 }
-function buildSource(recs,label,kind){
+function buildSource(recs,label,kind,zfOpt){
+  recs=recs.filter(r=>!r._empty||recs.length===1);
   if(!recs.length)throw new Error("集計できる行がありません（地域・年月・数値を確認してください）");
   for(const r of recs)for(const k in r.dims){const v=z2h(r.dims[k]).replace(/\s+/g,"");r.dims[k]=/^(総数|合計|総計|計|小計|全建築物計)$/.test(v)?"計":r.dims[k].trim()}
   const dimNames=[];const dimVals={};
@@ -600,8 +621,18 @@ function buildSource(recs,label,kind){
     map.set(sel+"|"+r.pref+"|"+r.t,r.v);if(r.unit)units.set(sel,r.unit);
     if(r.pref===0)nat=true;
     if(r.t.startsWith("FY"))fy.add(r.t);else if(r.t.length===4)an.add(r.t);else mo.add(r.t)}
-  return {kind,label,recs,dims,months:[...mo].sort(),annual:[...an].sort(),fys:[...fy].sort(),hasNational:nat,
-    unit:sel=>units.get(sel)||"",get:(sel,p,t)=>map.get(sel+"|"+p+"|"+t),count:recs.length};
+  const zeroFill=!!(zfOpt||recs.some(r=>r.sparse));const mset=new Set([...mo,...an,...fy]);
+  const raw=(sel,p,t)=>{const v=map.get(sel+"|"+p+"|"+t);if(v!==undefined)return v;return zeroFill&&mset.has(t)?0:undefined};
+  // 用途（A〜R）があるときは「非住宅（D〜R）」を合成
+  const virt=[];
+  dims.forEach((d,i)=>{if(!/用途/.test(d.name))return;const mem=d.values.filter(v=>/^[D-R] /.test(v));if(mem.length<5)return;
+    const lab="非住宅（D〜R）";d.values.splice(d.values.indexOf("計")+1,0,lab);virt.push({i,lab,mem})});
+  const get=(sel,p,t)=>{
+    if(virt.length){const parts=sel.split(SEP);for(const vv of virt)if(parts[vv.i]===vv.lab){let s=0,any=false;for(const m of vv.mem){const q=parts.slice();q[vv.i]=m;const v=get(q.join(SEP),p,t);if(v!==undefined&&v!==null){s+=v;any=true}}return any?s:undefined}}
+    return raw(sel,p,t)};
+  const unitOf=sel=>{let u=units.get(sel);if(u)return u;if(virt.length){const parts=sel.split(SEP);for(const vv of virt)if(parts[vv.i]===vv.lab){const q=parts.slice();q[vv.i]=vv.mem[0];return units.get(q.join(SEP))||""}}return ""};
+  return {kind,label,recs,dims,zeroFill,months:[...mo].sort(),annual:[...an].sort(),fys:[...fy].sort(),hasNational:nat,
+    unit:unitOf,get,count:recs.length};
 }
 /* e-Stat API JSON → レコード */
 function estatToRecords(json,fbT){
@@ -767,7 +798,13 @@ const GLOSSARY=[
     ["C 居住産業併用建築物","店舗付き住宅など、住まいと事業の両方に使う建物です。"],
     ["D〜Q 産業別の建築物","農林水産業、製造業、運輸業、卸売・小売業、宿泊・飲食、医療・福祉、公務など、使う産業ごとの建物です。工場は製造業用、倉庫は運輸業用や卸売・小売業用などに入ります。"],
     ["R 他に分類されない建築物","上のどれにも当たらない建物です。"],
+    ["非住宅（D〜R）","アプリで合成した区分で、D〜Rの合計です。住宅系（A〜C）を除いた事務所・店舗・工場・倉庫・病院・学校などにあたります。用途の振り分け方の都合で、公表の計から引き算した値とは少し異なることがあります。"],
     ["計","全建築物の合計です。"]]},
+  {re:/階数/,title:"地上の階数",intro:"地下を除いた、地上部分の階数による区分です（新築工事が対象）。表4-1は15階までで、16階以上は表4-2に分かれています。",items:[
+    ["1階〜3階","低層の建物です。非住宅の木造化の余地を見るときは、主にこの層が対象になります。"],
+    ["4〜5階・6〜9階","中層の建物です。木造では耐火構造などが求められ、事例が増えつつあります。"],
+    ["10〜15階","高層の建物です。"],
+    ["計","15階までのすべての階数の合計です。"]]},
   {re:/建て方/,title:"建て方",intro:"1棟の中で住宅がどう配置されているかによる区分です。",items:[
     ["一戸建","1棟に1戸の住宅です。"],
     ["長屋建","2戸以上の住宅を1棟に建て、廊下や階段などを共用せずに、それぞれが直接外に出入りできるものです。テラスハウスなどです。"],
@@ -805,9 +842,28 @@ function render(){
   const what=SRC.dims.filter(d=>d.values.length>1).map(d=>S.sel[d.name]).filter(v=>!/^(総数|計)$/.test(v)).join("・")||"総数";
   $("subtitle").textContent=`${pl}　${what}　（比較：${pp}）`;
   $("unitNote").textContent=unit?"単位："+unit:"";
-  const rows=[];for(let p=0;p<=47;p++)rows.push({p,...agg(sel,p,S.mode,S.Y,S.M)});
+  const sd=shareDim();$("shareBtn").disabled=!sd;$("shareBtn").title=sd?`${sd.name}の計に対する「${S.sel[sd.name]}」の割合`:"構造などで「計」以外（例：木造）を選ぶと使えます";
+  const SH=S.metric==="share"&&!!sd;LAST.share=SH?{dim:sd.name,val:S.sel[sd.name]}:null;
+  const rows=[];
+  if(SH){const den=selKey({...S.sel,[sd.name]:"計"});
+    for(let p=0;p<=47;p++){const a=agg(sel,p,S.mode,S.Y,S.M),b=agg(den,p,S.mode,S.Y,S.M);
+      const c=a.cur!==null&&b.cur>0?a.cur/b.cur*100:null,pv=a.prev!==null&&b.prev>0?a.prev/b.prev*100:null;
+      rows.push({p,cur:c,prev:pv,diff:c!==null&&pv!==null?c-pv:null,yoy:c!==null&&pv!==null?c-pv:null,raw:a.cur,den:b.cur})}}
+  else for(let p=0;p<=47;p++)rows.push({p,...agg(sel,p,S.mode,S.Y,S.M)});
   const nat=rows[0];
-  $("kLab1").textContent="全国 当期";
+  if(SH){
+    $("kLab1").textContent=`全国 ${S.sel[sd.name]}の構成比`;
+    $("kCur").textContent=fmtPct(nat.cur);$("kCurN").textContent=`${pl}（${fmt(nat.raw)}${unit?" "+unit:""}／計 ${fmt(nat.den)}）`;
+    $("kPrev").textContent=fmtPct(nat.prev);$("kPrevN").textContent=pp;
+    $("kLab3").textContent="全国 構成比の前年差";$("kLab4").textContent="構成比が上昇・低下した都道府県";
+    $("kYoy").textContent=fmtPt(nat.diff);$("kYoy").className="v "+sgn(nat.diff);$("kDiff").textContent="構成比の前年差（ポイント）";
+    const up=rows.slice(1).filter(r=>r.diff!==null&&r.diff>0).length,dn=rows.slice(1).filter(r=>r.diff!==null&&r.diff<0).length;
+    $("kCount").innerHTML=`<span class="pos">上昇${up}</span> <small>/</small> <span class="neg">低下${dn}</span>`;
+    const top=rows.slice(1).filter(r=>r.cur!==null).sort((a,b)=>b.cur-a.cur);
+    $("kCountN").textContent=top.length?`最高 ${PREFS[top[0].p]} ${fmtPct(top[0].cur)}／最低 ${PREFS[top[top.length-1].p]} ${fmtPct(top[top.length-1].cur)}`:"";
+    renderMap(rows,unit);renderTable(rows,unit);renderTrend(sel,unit);renderBreakdown(unit);renderRegions(sel,unit);renderCross(unit);showInfo(S.area);return;
+  }
+  $("kLab1").textContent="全国 当期";$("kLab3").textContent="全国 前年同期比";$("kLab4").textContent="都道府県の増減";
   $("kCur").innerHTML=fmt(nat.cur)+(unit&&nat.cur!==null?`<small>${esc(unit)}</small>`:"");$("kCurN").textContent=pl;
   $("kPrev").innerHTML=fmt(nat.prev)+(unit&&nat.prev!==null?`<small>${esc(unit)}</small>`:"");$("kPrevN").textContent=pp;
   $("kYoy").textContent=fmtP(nat.yoy);$("kYoy").className="v "+sgn(nat.yoy);$("kDiff").textContent="前年差 "+fmtS(nat.diff)+(unit?" "+unit:"");
@@ -815,9 +871,13 @@ function render(){
   $("kCount").innerHTML=`<span class="pos">増${up}</span> <small>/</small> <span class="neg">減${dn}</span>`;
   const top=rows.slice(1).filter(r=>r.yoy!==null).sort((a,b)=>b.yoy-a.yoy);
   $("kCountN").textContent=top.length?`最大 ${PREFS[top[0].p]} ${fmtP(top[0].yoy)}／最小 ${PREFS[top[top.length-1].p]} ${fmtP(top[top.length-1].yoy)}`:"";
-  renderMap(rows,unit);renderTable(rows,unit);renderTrend(sel,unit);renderBreakdown(unit);renderRegions(sel,unit);
+  renderMap(rows,unit);renderTable(rows,unit);renderTrend(sel,unit);renderBreakdown(unit);renderRegions(sel,unit);renderCross(unit);
   showInfo(S.area);
 }
+function shareDim(){if(!SRC)return null;const c=SRC.dims.filter(d=>d.values.includes("計")&&S.sel[d.name]!=="計"&&!/表章/.test(d.name));return c.find(d=>/構造/.test(d.name))||c[0]||null}
+const fmtPct=v=>v===null||v===undefined?"—":v.toFixed(1)+"%";
+const fmtPt=v=>v===null||v===undefined?"—":(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(1)+"pt";
+function ratingPt(d){if(d===null)return ["—","c-na"];if(d>=3)return ["上昇","c-u3"];if(d>=0)return ["微増","c-u1"];if(d>-3)return ["微減","c-d1"];return ["低下","c-d3"]}
 let LAST={};
 function renderMap(rows,unit){
   LAST.rows=rows;LAST.unit=unit;
@@ -828,27 +888,32 @@ function renderMap(rows,unit){
     br=[-a,-b,-c,0,c,b,a];colors=YOYC;labels=[`−${nf.format(a)}未満`,`〜−${nf.format(b)}`,`〜−${nf.format(c)}`,"〜0","0〜",`+${nf.format(c)}〜`,`+${nf.format(b)}〜`,`+${nf.format(a)}以上`]}
   else{const vals=rows.slice(1).map(r=>r.cur).filter(v=>v!==null).sort((a,b)=>a-b);const q=f=>vals.length?nice(vals[Math.floor(f*(vals.length-1))]):0;
     br=[q(.2),q(.4),q(.6),q(.8)];colors=["--s1","--s2","--s3","--s4","--s5"];labels=[`${nf.format(br[0])}未満`,`〜${nf.format(br[1])}`,`〜${nf.format(br[2])}`,`〜${nf.format(br[3])}`,`${nf.format(br[3])}以上`]}
+  if(LAST.share){const vals=rows.slice(1).map(r=>r.cur).filter(v=>v!==null).sort((a,b)=>a-b);const q=f=>vals.length?Math.round(vals[Math.floor(f*(vals.length-1))]):0;
+    br=[q(.2),q(.4),q(.6),q(.8)];colors=["--s1","--s2","--s3","--s4","--s5"];labels=[`${br[0]}%未満`,`〜${br[1]}%`,`〜${br[2]}%`,`〜${br[3]}%`,`${br[3]}%以上`]}
   const key=S.metric==="yoy"?"yoy":S.metric==="diff"?"diff":"cur";
   for(const el of $("map").querySelectorAll("path")){const p=+el.dataset.id;const v=rows[p][key];
     el.style.fill=v===null?col("--nodata"):col(colors[classIdx(v,br)]);el.classList.toggle("sel",p===S.area)}
   $("legend").innerHTML=colors.map((c,i)=>`<div class="sw"><i style="background:var(${c})"></i>${labels[i]}</div>`).join("");
-  $("mapTitle").textContent={yoy:"前年同期比",diff:"前年同期差"+(unit?"（"+unit+"）":""),value:"当期実数"+(unit?"（"+unit+"）":"")}[S.metric];
+  $("mapTitle").textContent=LAST.share?`${LAST.share.val}の構成比（${LAST.share.dim}の計に対する割合）`:({yoy:"前年同期比",diff:"前年同期差"+(unit?"（"+unit+"）":""),value:"当期実数"+(unit?"（"+unit+"）":""),share:"前年同期比"}[S.metric]);
 }
 function nice(v){if(!v)return 0;const s=Math.sign(v);v=Math.abs(v);const e=Math.pow(10,Math.floor(Math.log10(v)));const f=v/e;return s*(f<1.5?1:f<2.5?2:f<4?3:f<7.5?5:10)*e}
 function showInfo(p){
-  if(!LAST.rows)return;const r=LAST.rows[p];const u=LAST.unit?" "+LAST.unit:"";const [rl,rc]=rating(r.yoy);
+  if(!LAST.rows)return;const r=LAST.rows[p];
+  if(LAST.share){const [rl,rc]=ratingPt(r.diff);$("mapInfo").innerHTML=`<b>${PREFS[p]}</b>　${esc(LAST.share.val)}の構成比 <b>${fmtPct(r.cur)}</b>（${fmt(r.raw)}／計 ${fmt(r.den)}）　前年同期 ${fmtPct(r.prev)}　<span class="${sgn(r.diff)}"><b>${fmtPt(r.diff)}</b></span>　<span class="chip ${rc}">${rl}</span>`;return}const u=LAST.unit?" "+LAST.unit:"";const [rl,rc]=rating(r.yoy);
   $("mapInfo").innerHTML=`<b>${PREFS[p]}</b>　当期 ${fmt(r.cur)}${u}　前年同期 ${fmt(r.prev)}${u}　<span class="${sgn(r.yoy)}"><b>${fmtP(r.yoy)}</b></span>　<span class="chip ${rc}">${rl}</span>`;
 }
 function renderTable(rows,unit){
-  const cols=[["p","都道府県"],["cur","当期"],["prev","前年同期"],["diff","増減"],["yoy","前年比"],["r","判定"]];
+  const SH=!!LAST.share;
+  const cols=SH?[["p","都道府県"],["cur","構成比"],["prev","前年同期"],["raw","実数"],["yoy","前年差"],["r","判定"]]:[["p","都道府県"],["cur","当期"],["prev","前年同期"],["diff","増減"],["yoy","前年比"],["r","判定"]];
   $("tbl").tHead.innerHTML="<tr>"+cols.map(([k,l])=>`<th scope="col"${k==="prev"||k==="diff"?' class="hide-sm"':""}>${k==="r"?l:`<button type="button" data-k="${k}"${S.sortK===k?` data-dir="${S.sortD>0?"▲":"▼"}"`:""}>${l}</button>`}</th>`).join("")+"</tr>";
   const body=rows.slice(1).slice();
   body.sort((a,b)=>{if(S.sortK==="p")return (a.p-b.p)*S.sortD;const x=a[S.sortK],y=b[S.sortK];if(x===null)return 1;if(y===null)return -1;return (x-y)*S.sortD});
-  const mx=Math.max(20,...rows.map(r=>Math.abs(r.yoy??0)));const lim=Math.min(60,Math.ceil(mx/10)*10);
-  const tr=r=>{const [rl,rc]=rating(r.yoy);const w=r.yoy===null?0:Math.min(50,Math.abs(r.yoy)/lim*50);
+  const mx=Math.max(SH?5:20,...rows.map(r=>Math.abs(r.yoy??0)));const lim=SH?Math.ceil(mx):Math.min(60,Math.ceil(mx/10)*10);
+  const tr=r=>{const [rl,rc]=SH?ratingPt(r.yoy):rating(r.yoy);const w=r.yoy===null?0:Math.min(50,Math.abs(r.yoy)/lim*50);
     const bar=r.yoy===null?"":`<i style="${r.yoy>=0?"left:50%":"right:50%"};width:${w}%;background:var(${r.yoy>=0?"--u3":"--d3"})"></i>`;
-    return `<tr data-p="${r.p}" class="${r.p===0?"nat ":""}${r.p===S.area?"sel":""}"><td>${PREFS[r.p]}</td><td>${fmt(r.cur)}</td><td class="hide-sm">${fmt(r.prev)}</td><td class="hide-sm ${sgn(r.diff)}">${fmtS(r.diff)}</td><td><span class="yb"><span class="${sgn(r.yoy)}">${fmtP(r.yoy)}</span><span class="ybar">${bar}</span></span></td><td><span class="chip ${rc}">${rl}</span></td></tr>`};
+    return `<tr data-p="${r.p}" class="${r.p===0?"nat ":""}${r.p===S.area?"sel":""}"><td>${PREFS[r.p]}</td><td>${SH?fmtPct(r.cur):fmt(r.cur)}</td><td class="hide-sm">${SH?fmtPct(r.prev):fmt(r.prev)}</td><td class="hide-sm ${SH?"":sgn(r.diff)}">${SH?fmt(r.raw):fmtS(r.diff)}</td><td><span class="yb"><span class="${sgn(r.yoy)}">${SH?fmtPt(r.yoy):fmtP(r.yoy)}</span><span class="ybar">${bar}</span></span></td><td><span class="chip ${rc}">${rl}</span></td></tr>`};
   $("tbl").tBodies[0].innerHTML=tr(rows[0])+body.map(tr).join("");
+  $("tblNote").textContent=SH?"構成比の判定：前年差 +3pt以上「上昇」／0〜+3pt「微増」／−3〜0pt「微減」／−3pt未満「低下」。見出しを押すと並べ替えます。":"判定：前年同期比 +10%以上「拡大」／0〜+10%「増加」／−10〜0%「減少」／−10%未満「縮小」。見出しを押すと並べ替えます。";
 }
 function renderTrend(sel,unit){
   $("trendArea").textContent=PREFS[S.area];
@@ -890,7 +955,8 @@ function renderTrend(sel,unit){
 function axisNum(v){return v>=1e6?(v/1e6).toLocaleString("ja-JP",{maximumFractionDigits:1})+"百万":v>=1e4?(v/1e4).toLocaleString("ja-JP",{maximumFractionDigits:1})+"万":nf.format(v)}
 function listRows(items,unit,tot){
   const mx=Math.max(1,...items.map(i=>i.cur??0));
-  return items.map((it,i)=>{const [rl,rc]=rating(it.yoy);return `<div class="li${tot&&i===0?" tot":""}"><span class="nm" title="${esc(it.name)}">${esc(it.name)}</span><span class="bar"><i style="width:${(it.cur??0)/mx*100}%"></i></span><span class="num">${fmt(it.cur)}<br><span class="${sgn(it.yoy)}" style="font-size:12px">${fmtP(it.yoy)}</span></span><span class="chip ${rc}">${rl}</span></div>`}).join("")+(unit?`<p class="note" style="margin:2px 0 0">単位：${esc(unit)}　期間：${esc(periodLabel(S.mode,S.Y,S.M))}</p>`:"");
+  const base=tot&&items[0]&&items[0].cur>0?items[0].cur:null;
+  return items.map((it,i)=>{const [rl,rc]=rating(it.yoy);return `<div class="li${tot&&i===0?" tot":""}"><span class="nm" title="${esc(it.name)}">${esc(it.name)}${base&&i>0&&it.cur!==null?`<br><span class="note">構成比 ${(it.cur/base*100).toFixed(1)}%</span>`:""}</span><span class="bar"><i style="width:${(it.cur??0)/mx*100}%"></i></span><span class="num">${fmt(it.cur)}<br><span class="${sgn(it.yoy)}" style="font-size:12px">${fmtP(it.yoy)}</span></span><span class="chip ${rc}">${rl}</span></div>`}).join("")+(unit?`<p class="note" style="margin:2px 0 0">単位：${esc(unit)}　期間：${esc(periodLabel(S.mode,S.Y,S.M))}</p>`:"");
 }
 function renderBreakdown(unit){
   $("bdArea").textContent=PREFS[S.area];
@@ -904,6 +970,33 @@ function renderBreakdown(unit){
 function renderRegions(sel,unit){
   $("regList").innerHTML=listRows(REGIONS.map(([n,ids])=>({name:n,...aggRegion(sel,ids)})),unit,false);
 }
+const ABBR={"鉄骨鉄筋コンクリート造":"SRC造","鉄筋コンクリート造":"RC造","鉄骨造":"S造","コンクリートブロック造":"CB造"};
+function crossCands(){return SRC.dims.filter(d=>d.values.length>1&&!/表章/.test(d.name))}
+function renderCross(unit){
+  const cands=crossCands();const sec=$("secCross");
+  if(cands.length<2){sec.hidden=true;return}sec.hidden=false;
+  if(!cands.some(d=>d.name===S.crRow))S.crRow=(cands.find(d=>/階数/.test(d.name))||cands[0]).name;
+  if(!cands.some(d=>d.name===S.crCol)||S.crCol===S.crRow)S.crCol=(cands.find(d=>/構造/.test(d.name)&&d.name!==S.crRow)||cands.find(d=>d.name!==S.crRow)).name;
+  $("crRow").innerHTML=cands.map(d=>`<option${d.name===S.crRow?" selected":""}>${esc(d.name)}</option>`).join("");
+  $("crCol").innerHTML=cands.filter(d=>d.name!==S.crRow).map(d=>`<option${d.name===S.crCol?" selected":""}>${esc(d.name)}</option>`).join("");
+  const rd=SRC.dims.find(d=>d.name===S.crRow),cd=SRC.dims.find(d=>d.name===S.crCol);
+  const hasTot=cd.values.includes("計");const fv=cd.values.filter(v=>v!=="計");
+  if(!fv.includes(S.crFocus))S.crFocus=fv.find(v=>v==="木造")||fv[0];
+  $("crFocus").innerHTML=fv.map(v=>`<option${v===S.crFocus?" selected":""}>${esc(v)}</option>`).join("");$("crFocus").disabled=!hasTot;
+  $("crossArea").textContent=PREFS[S.area];
+  const cell=(rv,cv)=>agg(selKey({...S.sel,[rd.name]:rv,[cd.name]:cv}),S.area,S.mode,S.Y,S.M);
+  let h=`<thead><tr><th>${esc(rd.name)}＼${esc(cd.name)}</th>${hasTot?`<th class="focus">${esc(ABBR[S.crFocus]||S.crFocus)}率</th><th>前年差</th>`:""}${cd.values.map(v=>`<th class="${v===S.crFocus?"focus":""}" title="${esc(v)}">${esc(ABBR[v]||v)}</th>`).join("")}</tr></thead><tbody>`;
+  for(const rv of rd.values){
+    const cs=cd.values.map(cv=>({cv,...cell(rv,cv)}));const tot=cs.find(c=>c.cv==="計"),f=cs.find(c=>c.cv===S.crFocus);
+    const sh=hasTot&&tot&&tot.cur>0&&f.cur!==null?f.cur/tot.cur*100:null,shp=hasTot&&tot&&tot.prev>0&&f.prev!==null?f.prev/tot.prev*100:null;
+    h+=`<tr class="${rv==="計"?"nat":""}"><td>${esc(rv)}</td>${hasTot?`<td class="focus share">${fmtPct(sh)}</td><td class="${sgn(sh!==null&&shp!==null?sh-shp:null)}">${fmtPt(sh!==null&&shp!==null?sh-shp:null)}</td>`:""}${cs.map(c=>`<td class="${c.cv===S.crFocus?"focus":""}">${fmt(c.cur)}<small class="${sgn(c.yoy)}">${fmtP(c.yoy)}</small></td>`).join("")}</tr>`}
+  $("crossTbl").innerHTML=h+"</tbody>";
+  const other=SRC.dims.filter(d=>d.name!==rd.name&&d.name!==cd.name&&d.values.length>1).map(d=>`${d.name}：${S.sel[d.name]}`).join("、");
+  $("crossNote").textContent=`${periodLabel(S.mode,S.Y,S.M)}。${other}${unit?"。単位："+unit:""}。各欄の下は前年同期比、「${S.crFocus}率」は${cd.name}の計に対する割合です。上の条件（用途など）を変えると表も切り替わります。`;
+}
+$("crRow").addEventListener("change",e=>{S.crRow=e.target.value;render()});
+$("crCol").addEventListener("change",e=>{S.crCol=e.target.value;render()});
+$("crFocus").addEventListener("change",e=>{S.crFocus=e.target.value;render()});
 function selectArea(p){S.area=S.area===p?0:p;render()}
 
 /* ---------- 入力 ---------- */
@@ -1110,22 +1203,24 @@ const IDB={
 };
 function packSource(src){
   const names=src.dims.map(d=>d.name),vals=src.dims.map(d=>d.values);const vi=vals.map(v=>new Map(v.map((x,i)=>[x,i])));
-  const times=[],ti=new Map(),units=[""],ui=new Map([["",0]]);const w=names.length+4;
-  const arr=new Float64Array(src.recs.length*w);let o=0;
-  for(const r of src.recs){names.forEach((n,i)=>arr[o++]=vi[i].get(r.dims[n]??"")??-1);arr[o++]=r.pref;
-    if(!ti.has(r.t)){ti.set(r.t,times.length);times.push(r.t)}arr[o++]=ti.get(r.t);
-    const u=r.unit||"";if(!ui.has(u)){ui.set(u,units.length);units.push(u)}arr[o++]=ui.get(u);arr[o++]=r.v}
-  return {v:1,label:src.label,kind:src.kind,names,vals,times,units,w,arr,savedAt:Date.now()};
+  const times=[],ti=new Map(),units=[""],ui=new Map([["",0]]);const k=names.length+3,n=src.recs.length;
+  const idx=new Uint16Array(n*k),val=new Float64Array(n);const pref=new Uint8Array(n);let o=0;
+  src.recs.forEach((r,i)=>{names.forEach((nm,j)=>idx[o++]=(vi[j].get(r.dims[nm]??"")??-1)+1);
+    if(!ti.has(r.t)){ti.set(r.t,times.length);times.push(r.t)}idx[o++]=ti.get(r.t);
+    const u=r.unit||"";if(!ui.has(u)){ui.set(u,units.length);units.push(u)}idx[o++]=ui.get(u);idx[o++]=r.pref;val[i]=r.v});
+  return {v:2,label:src.label,kind:src.kind,zf:src.zeroFill,names,vals,times,units,k,idx,val,savedAt:Date.now()};
 }
 function unpackSource(p){
   const recs=[];const n=p.names.length;
-  for(let o=0;o<p.arr.length;o+=p.w){const dims={};for(let i=0;i<n;i++){const k=p.arr[o+i];if(k>=0)dims[p.names[i]]=p.vals[i][k]}
+  if(p.v===2){for(let i=0,o=0;i<p.val.length;i++,o+=p.k){const dims={};for(let j=0;j<n;j++){const x=p.idx[o+j]-1;if(x>=0)dims[p.names[j]]=p.vals[j][x]}
+      recs.push({dims,t:p.times[p.idx[o+n]],unit:p.units[p.idx[o+n+1]],pref:p.idx[o+n+2],v:p.val[i]})}}
+  else for(let o=0;o<p.arr.length;o+=p.w){const dims={};for(let i=0;i<n;i++){const k=p.arr[o+i];if(k>=0)dims[p.names[i]]=p.vals[i][k]}
     recs.push({dims,pref:p.arr[o+n],t:p.times[p.arr[o+n+1]],unit:p.units[p.arr[o+n+2]],v:p.arr[o+n+3]})}
-  const src=buildSource(recs,p.label,p.kind);src.savedAt=p.savedAt;return src;
+  const src=buildSource(recs,p.label,p.kind,p.zf);src.savedAt=p.savedAt;return src;
 }
 const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
 function showSaved(msg){$("saveInfo").textContent=msg}
-const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）","表5":"表5 建築物 都道府県別・建築主別","表6-1":"表6-1 建築物 都道府県別・構造別","表7-1":"表7-1 建築物 都道府県別・用途別"};
+const TABLE_NAMES={"表15":"表15 都道府県別・利用関係別","表16":"表16 都道府県別・建て方別","表18":"表18 都道府県別・構造別・建て方別（新設）","表5":"表5 建築物 都道府県別・建築主別","表6-1":"表6-1 建築物 都道府県別・構造別","表7-1":"表7-1 建築物 都道府県別・用途別","表4-1":"表4-1 建築物 都道府県別・用途別・階数別・構造別（新築）"};
 const ID_TABLE={"0003114535":"表15","0003114565":"表16"};
 function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表(?:\s*[-－ー―‐]\s*(\d+))?/);return m?String(+m[1])+(m[2]?"-"+(+m[2]):""):null}
 let META={active:null,list:[]};
@@ -1133,7 +1228,7 @@ async function saveMeta(){try{await IDB.put("meta",META)}catch(e){}renderDsList(
 async function loadDataset(recs,key,label,kind){
   let base=null;
   if($("appendChk").checked){
-    if(META.list.some(x=>x.key===key)){try{const p=await IDB.get("ds:"+key);if(p&&p.arr)base=unpackSource(p).recs}catch(e){}}
+    if(META.list.some(x=>x.key===key)){try{const p=await IDB.get("ds:"+key);if(p&&(p.arr||p.idx))base=unpackSource(p).recs}catch(e){}}
     else if(SRC&&SRC.kind!=="demo"&&SRC.recs){base=SRC.recs;key=SRC.key||key}
   }
   const src=buildSource(base?base.concat(recs):recs,TABLE_NAMES[key]||label,kind);src.key=key;
@@ -1151,7 +1246,7 @@ async function persist(src){
 }
 async function switchDataset(key){
   if(key==="__demo"){META.active=null;await saveMeta();setSource(makeDemo(),true);showSaved("");return}
-  try{const p=await IDB.get("ds:"+key);if(!p||!p.arr)throw 0;const src=unpackSource(p);src.key=key;setSource(src,true,true);
+  try{const p=await IDB.get("ds:"+key);if(!p||!(p.arr||p.idx))throw 0;const src=unpackSource(p);src.key=key;setSource(src,true,true);
     META.active=key;await saveMeta();showSaved(`保存した「${src.label}」を表示しています（${fmtDT(src.savedAt)} 保存）。`)}
   catch(e){showSaved("保存データを開けませんでした。");}
 }
@@ -1180,7 +1275,7 @@ buildMap();
   try{const m=await IDB.get("meta");if(m&&m.list)META=m}catch(e){}
   try{ // 旧形式（1件のみ保存）からの移行
     const old=await IDB.get("source");
-    if(old&&old.arr){const src=unpackSource(old);const k=tableNoOf([[src.label]])?"表"+tableNoOf([[src.label]]):src.label;
+    if(old&&(old.arr||old.idx)){const src=unpackSource(old);const k=tableNoOf([[src.label]])?"表"+tableNoOf([[src.label]]):src.label;
       await IDB.put("ds:"+k,old);META.list=META.list.filter(x=>x.key!==k);META.list.push({key:k,label:src.label,savedAt:old.savedAt,range:""});META.active=k;await IDB.put("meta",META);await IDB.del("source")}
   }catch(e){}
   if(META.active&&META.list.some(x=>x.key===META.active))await switchDataset(META.active);
