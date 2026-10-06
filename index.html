@@ -343,7 +343,8 @@ section[id],details[id]{scroll-margin-top:12px}
         <h3>現在のデータ</h3>
         <div class="status" id="fileStatus"></div>
         <p id="srcDetail"></p>
-        <button class="btn" id="demoBtn" type="button">架空データに戻す</button>
+        <p class="note" id="saveInfo" style="margin:0"></p>
+        <button class="btn" id="demoBtn" type="button">保存データを消して架空データに戻す</button>
         <h3 style="margin-top:8px">出典と注意</h3>
         <p>原典：国土交通省「<a href="https://www.mlit.go.jp/sogoseisaku/jouhouka/sosei_jouhouka_tk4_000002.html" target="_blank" rel="noopener">建築着工統計調査</a>」（毎月末頃に前月分を公表）、<a href="https://www.e-stat.go.jp/stat-search/database?toukei=00600120" target="_blank" rel="noopener">e-Stat</a>。統計表の「−」は0、「…」「x」は欠測として扱います。累計・年計は月次値の合計で、期間内に欠測月があると表示しません。1戸あたり工事費など比率の指標は合計できないため単月で見てください。</p>
       </section>
@@ -640,8 +641,9 @@ function segInit(id,key,cb){
 function segSync(id,val){for(const b of $(id).querySelectorAll("button"))b.setAttribute("aria-pressed",String(b.dataset.v===val))}
 function save(){store.set("view",{mode:S.mode,metric:S.metric,trend:S.trend,sel:S.sel,bd:S.bd})}
 
-function setSource(src,keepView){
+function setSource(src,keepView,fromSave){
   SRC=src;memo.clear();
+  if(src.kind!=="demo"&&!fromSave)persist(src);
   const saved=keepView?store.get("view"):null;
   S.sel={};
   for(const d of SRC.dims){
@@ -799,7 +801,7 @@ $("bdDim").addEventListener("change",e=>{S.bd=e.target.value;save();render()});
 $("tbl").addEventListener("click",e=>{const b=e.target.closest("th button");if(b){const k=b.dataset.k;if(S.sortK===k)S.sortD*=-1;else{S.sortK=k;S.sortD=k==="p"?1:-1}render();return}
   const tr=e.target.closest("tbody tr");if(tr)selectArea(+tr.dataset.p)});
 $("openData").addEventListener("click",()=>{const d=$("dataPanel");d.open=true;d.scrollIntoView({behavior:"smooth",block:"start"})});
-$("demoBtn").addEventListener("click",()=>{setSource(makeDemo(),false);$("fileStatus").textContent="架空データに戻しました。"});
+$("demoBtn").addEventListener("click",async()=>{setSource(makeDemo(),false);try{await IDB.del("source")}catch(e){}showSaved("");$("fileStatus").textContent="保存データを消して、架空データに戻しました。"});
 $("copyBtn").addEventListener("click",async()=>{
   const u=LAST.unit?"（"+LAST.unit+"）":"";
   const lines=[["都道府県","当期"+u,"前年同期"+u,"増減","前年同期比(%)","判定"].join("\t")];
@@ -982,11 +984,44 @@ $("xLoad").addEventListener("click",async()=>{
     st.textContent=(e instanceof TypeError)?"e-Statのファイルはアプリから直接読み込めませんでした（ブラウザの制限）。月のボタンで保存し、「ファイルを選ぶ」から選んでください。":"読み込めませんでした："+e.message}
   finally{$("xLoad").disabled=false}
 });
+/* 端末への保存（IndexedDB） */
+const IDB={
+  open(){return this._p||(this._p=new Promise((res,rej)=>{let r;try{r=indexedDB.open("hsmap",1)}catch(e){return rej(e)}
+    r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))},
+  async run(mode,fn){const db=await this.open();return new Promise((res,rej)=>{const tx=db.transaction("kv",mode);const st=tx.objectStore("kv");const rq=fn(st);tx.oncomplete=()=>res(rq&&rq.result);tx.onerror=tx.onabort=()=>rej(tx.error)})},
+  get(k){return this.run("readonly",s=>s.get(k))},put(k,v){return this.run("readwrite",s=>s.put(v,k))},del(k){return this.run("readwrite",s=>s.delete(k))}
+};
+function packSource(src){
+  const names=src.dims.map(d=>d.name),vals=src.dims.map(d=>d.values);const vi=vals.map(v=>new Map(v.map((x,i)=>[x,i])));
+  const times=[],ti=new Map(),units=[""],ui=new Map([["",0]]);const w=names.length+4;
+  const arr=new Float64Array(src.recs.length*w);let o=0;
+  for(const r of src.recs){names.forEach((n,i)=>arr[o++]=vi[i].get(r.dims[n]??"")??-1);arr[o++]=r.pref;
+    if(!ti.has(r.t)){ti.set(r.t,times.length);times.push(r.t)}arr[o++]=ti.get(r.t);
+    const u=r.unit||"";if(!ui.has(u)){ui.set(u,units.length);units.push(u)}arr[o++]=ui.get(u);arr[o++]=r.v}
+  return {v:1,label:src.label,kind:src.kind,names,vals,times,units,w,arr,savedAt:Date.now()};
+}
+function unpackSource(p){
+  const recs=[];const n=p.names.length;
+  for(let o=0;o<p.arr.length;o+=p.w){const dims={};for(let i=0;i<n;i++){const k=p.arr[o+i];if(k>=0)dims[p.names[i]]=p.vals[i][k]}
+    recs.push({dims,pref:p.arr[o+n],t:p.times[p.arr[o+n+1]],unit:p.units[p.arr[o+n+2]],v:p.arr[o+n+3]})}
+  const src=buildSource(recs,p.label,p.kind);src.savedAt=p.savedAt;return src;
+}
+const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
+function showSaved(msg){$("saveInfo").textContent=msg}
+async function persist(src){
+  try{await IDB.put("source",packSource(src));src.savedAt=Date.now();showSaved(`この端末に保存しました（${fmtDT(src.savedAt)}）。再読み込みしても残ります。`)}
+  catch(e){showSaved("この端末に保存できませんでした（プライベートブラウズでは保存されません）。")}
+}
 let rz;let lastW=0;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{const w=$("trend").clientWidth;if(SRC&&w!==lastW){lastW=w;renderTrend(selKey(S.sel),SRC.unit(selKey(S.sel)))}},150)});
 $("tabbar").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const t=$(b.dataset.t);if(t.tagName==="DETAILS")t.open=true;t.scrollIntoView({behavior:"smooth",block:"start"})});
 if("IntersectionObserver" in window){const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting)for(const b of $("tabbar").querySelectorAll("button"))b.setAttribute("aria-current",String(b.dataset.t===e.target.id))},{rootMargin:"-40% 0px -55% 0px"});["secCond","secMap","secTable","secTrend","dataPanel"].forEach(id=>io.observe($(id)))}
 buildMap();
-setSource(makeDemo(),true);
+(async()=>{
+  let saved=null;
+  try{const p=await IDB.get("source");if(p&&p.arr)saved=unpackSource(p)}catch(e){}
+  if(saved){setSource(saved,true,true);showSaved(`この端末に保存したデータを表示しています（${fmtDT(saved.savedAt)} 保存）。`)}
+  else setSource(makeDemo(),true);
+})();
 </script>
 
 </body></html>
