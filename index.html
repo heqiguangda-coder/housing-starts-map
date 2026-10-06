@@ -421,7 +421,7 @@ function parseTime(name,code){
 }
 function matchPref(name){
   const s=z2h(name??"").replace(/[\s\d_:：.\-]/g,"");if(!s)return null;
-  if(/^全国/.test(s))return 0;
+  if(/^全国(計|合計|総数)?$/.test(s))return 0;
   for(let i=1;i<=47;i++)if(s===PREFS[i]||s===PREFS[i].replace(/[都府県]$/,""))return i;
   for(let i=1;i<=47;i++)if(s.startsWith(PREFS[i])&&/^(計|総数|合計|全域)?$/.test(s.slice(PREFS[i].length)))return i;
   return null;
@@ -451,14 +451,27 @@ function matrixToRecords(rows,fbT){
   const first=rows.findIndex(r=>matchPref(r[areaCol])!==null);
   const t=fbT||findYM(rows.slice(0,Math.max(first,1)).map(r=>r.join(" ")).join(" "));
   if(!t)throw new Error("表の年月が分かりません（ファイル名か表の上部に「2026年8月」などの表記が必要です）");
-  const hdr=rows.slice(Math.max(0,first-8),first).filter(r=>r.some((c,j)=>j!==areaCol&&String(c??"").trim()!==""));
-  const ff=hdr.map(r=>{let last="";return Array.from({length:ncol},(_,j)=>{const v=String(r[j]??"").replace(/\s+/g,"").trim();if(v)last=v;return j>areaCol?(v||last):v})});
-  const lvName=ff.map((r,i)=>{const txt=r.join("|");for(const [re,n] of LEVEL_NAMES)if(re.test(txt))return n;return "区分"+(i+1)});
-  const dataRows=rows.slice(first).filter(r=>matchPref(r[areaCol])!==null);
+  const cell=(r,j)=>z2h(String(r[j]??"")).replace(/\s+/g,"").trim();
+  // 見出し行：データ直前の、地域列より右に2つ以上の値がある行
+  const hdr=rows.slice(Math.max(0,first-8),first).filter(r=>{let n=0;for(let j=areaCol+1;j<ncol;j++)if(cell(r,j))n++;return n>=2});
+  // 上位の見出しが変わる所で下位の繰り返し（結合セル）を切る
+  const ff=[];
+  hdr.forEach((r,li)=>{let last="";ff.push(Array.from({length:ncol},(_,j)=>{
+    if(j<=areaCol)return "";
+    const v=cell(r,j);
+    if(ff.slice(0,li).some(up=>cell(hdr[ff.indexOf(up)],j)))last="";
+    if(v)last=v;return last}))});
+  const lvName=hdr.map((r,i)=>{
+    let lab="";for(let j=0;j<=areaCol;j++)if(cell(r,j)){lab=cell(r,j)}
+    if(lab&&!/都道府県|地域|市区町村/.test(lab))return lab;
+    const txt=ff[i].join("|");for(const [re,n] of LEVEL_NAMES)if(re.test(txt))return n;return "区分"+(i+1)});
+  // 同じ地域が再び現れたら（市部計・郡部計などの別表）そこで打ち切る
+  const seen=new Set();const dataRows=[];
+  for(const r of rows.slice(first)){const p=matchPref(r[areaCol]);if(p===null)continue;if(seen.has(p))break;seen.add(p);dataRows.push(r)}
   const cols=[];
   for(let j=0;j<ncol;j++){if(j===areaCol)continue;
     const nums=dataRows.filter(r=>isNumericCell(r[j])).length;if(nums<dataRows.length*.6)continue;
-    const labels=ff.map(r=>r[j]||"計");
+    const labels=ff.map(r=>(r[j]||"計").replace(/^(小計|合計|総計|総数)$/,"計"));
     if(labels.some(l=>/比|％|%|率|指数|構成|平均|あたり/.test(l)))continue;
     cols.push({j,labels})}
   if(!cols.length)return null;
@@ -466,8 +479,8 @@ function matrixToRecords(rows,fbT){
   const recs=[];
   for(const r of dataRows){const pref=matchPref(r[areaCol]);
     for(const c of cols){const v=parseNum(r[c.j]);if(v===undefined||v===null)continue;
-      const dims={};lvName.forEach((n,i)=>{if(used[i])dims[n]=c.labels[i].replace(/^総計$|^合計$|^総数$/,"計")});
-      recs.push({dims,pref,t,v})}}
+      const dims={};let unit="";lvName.forEach((n,i)=>{if(!used[i])return;let l=c.labels[i];const m=l.match(/^(.*?)[（(]([^）)]+)[）)]$/);if(m){l=m[1];unit=m[2]}dims[n]=l});
+      recs.push({dims,pref,t,v,unit})}}
   return recs;
 }
 function rowsToRecords(rows,fbT){
@@ -527,7 +540,7 @@ function rowsToRecords(rows,fbT){
 }
 function buildSource(recs,label,kind){
   if(!recs.length)throw new Error("集計できる行がありません（地域・年月・数値を確認してください）");
-  for(const r of recs)for(const k in r.dims){const v=z2h(r.dims[k]).replace(/\s+/g,"");r.dims[k]=/^(総数|合計|総計|計)$/.test(v)?"計":v}
+  for(const r of recs)for(const k in r.dims){const v=z2h(r.dims[k]).replace(/\s+/g,"");r.dims[k]=/^(総数|合計|総計|計|小計)$/.test(v)?"計":v}
   const dimNames=[];const dimVals={};
   for(const r of recs)for(const k in r.dims){if(!dimVals[k]){dimVals[k]=[];dimVals[k].set=new Set();dimNames.push(k)}if(!dimVals[k].set.has(r.dims[k])){dimVals[k].set.add(r.dims[k]);dimVals[k].push(r.dims[k])}}
   const dims=dimNames.map(n=>({name:n,values:dimVals[n].slice()}));
@@ -648,6 +661,7 @@ function setSource(src,keepView,fromSave){
   S.sel={};
   for(const d of SRC.dims){
     let v=saved&&saved.sel&&d.values.includes(saved.sel[d.name])?saved.sel[d.name]:null;
+    if(!v&&/工事/.test(d.name))v=d.values.find(x=>x==="新設");
     if(!v)v=d.values.find(x=>/総数|^計$|合計|総計|^全体$|^総$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values[0];
     S.sel[d.name]=v}
   if(saved){S.metric=saved.metric||S.metric;S.trend=saved.trend||S.trend;S.mode=saved.mode||S.mode}
