@@ -121,12 +121,16 @@ details.data>summary{cursor:pointer;padding:12px 16px;font-weight:700;list-style
 details.data>summary::-webkit-details-marker{display:none}
 details.data>summary::after{content:"＋";color:var(--muted)}
 details.data[open]>summary::after{content:"－"}
-.datagrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:0 16px 16px}
+.datagrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;padding:0 16px 16px}
 @media (max-width:900px){.datagrid{grid-template-columns:minmax(0,1fr)}}
 .datagrid section{display:grid;gap:8px;align-content:start;min-width:0}
 .datagrid h3{margin:0;font-size:14px}
 .datagrid p,.datagrid ol{margin:0;font-size:13px;color:var(--muted)}
 .datagrid ol{padding-left:1.3em}
+.xlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(7.5em,1fr));gap:6px}
+.xlist a{display:flex;align-items:center;justify-content:center;gap:4px;min-height:40px;border:1px solid var(--line);border-radius:4px;text-decoration:none;color:var(--ink);background:var(--sunk);font-size:13px;font-weight:700}
+.xlist a::before{content:"";width:14px;height:14px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10l5 5 5-5M4 20h16'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10l5 5 5-5M4 20h16'/%3E%3C/svg%3E") center/contain no-repeat}
+.xlist a:visited{color:var(--muted)}
 .drop{border:1.5px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);font-size:13px;display:grid;gap:8px;justify-items:center}
 .drop.over{border-color:var(--accent);background:var(--sunk)}
 .status{font-size:12.5px;min-height:1.4em}
@@ -316,6 +320,23 @@ section[id],details[id]{scroll-margin-top:12px}
         </div>
         <button class="btn primary" id="apiBtn" type="button">取得</button>
         <div class="status" id="apiStatus"></div>
+      </section>
+      <section>
+        <h3>月次Excelをダウンロード</h3>
+        <p>2025年以降の月次はExcelのみの公開です。e-Statのデータカタログから各月のExcelを探してボタンにします（アプリケーションIDを使います）。</p>
+        <div class="row">
+          <div class="fld"><label for="xTab">表</label>
+            <select id="xTab">
+              <option value="15">表15 都道府県別、工事別、利用関係別</option>
+              <option value="16">表16 都道府県別、工事別、住宅の種類別、建て方別</option>
+            </select></div>
+          <div class="fld"><label for="xFrom">開始年</label><input id="xFrom" type="number" value="2025" min="2000" max="2100" style="width:6em"></div>
+          <button class="btn" id="xFind" type="button">ファイルを探す</button>
+        </div>
+        <div class="status" id="xStatus"></div>
+        <div class="xlist" id="xList"></div>
+        <button class="btn primary" id="xLoad" type="button" hidden>まとめてアプリに読み込む</button>
+        <p class="note" id="xNote" hidden>ボタンを押すとExcelが保存されます（iPhoneは「ファイル」アプリの「ダウンロード」）。保存後、左の「ファイルを選ぶ」でまとめて選んでください。</p>
       </section>
       <section>
         <h3>現在のデータ</h3>
@@ -908,6 +929,58 @@ async function fetchSingle(a,fromY){
       st.textContent=`取得しました（${nf.format(recs.length)}件、最新：${last.replace("-","年")}${last.length===7?"月":""}）。それ以降の月はExcelを「今のデータに追加する」で足してください。`;
 }
 
+/* 月次Excel（データカタログ） */
+let XFILES=[];
+function catalogFiles(root,tabNo){
+  const infs=[].concat(root.DATA_CATALOG_LIST_INF&&root.DATA_CATALOG_LIST_INF.DATA_CATALOG_INF||[]);
+  const out=new Map();
+  for(const inf of infs){
+    const dsTxt=JSON.stringify(inf.DATASET||{});
+    for(const r of [].concat(inf.RESOURCES&&inf.RESOURCES.RESOURCE||[])){
+      const url=txt(r.URL);if(!/^https:\/\/www\.e-stat\.go\.jp\//.test(url))continue;
+      const fmt=txt(r.FORMAT).toUpperCase();if(fmt&&!/XLS/.test(fmt))continue;
+      const T=r.TITLE||{};const no=z2h(txt(T.TABLE_NO)).trim();const name=txt(T.TABLE_NAME)||txt(T.NAME);
+      if(no!==tabNo&&!(no===""&&new RegExp("(^|表)"+tabNo+"[^0-9-]").test(name)))continue;
+      if(!/都道府県/.test(name+txt(T.NAME)))continue;
+      const all=dsTxt+JSON.stringify(r);
+      let t=null;const sd=all.match(/"SURVEY_DATE"\s*:\s*"?(\d{4})(\d{2})/);
+      if(sd&&+sd[2]>=1&&+sd[2]<=12)t=ym(sd[1],+sd[2]);
+      if(!t)t=findYM(all);
+      if(!t)continue;
+      const prev=out.get(t);if(!prev||url>prev.url)out.set(t,{t,url,name})}}
+  return [...out.values()].sort((a,b)=>a.t<b.t?-1:1);
+}
+$("xFind").addEventListener("click",async()=>{
+  const st=$("xStatus");st.className="status";$("xFind").disabled=true;$("xList").innerHTML="";$("xLoad").hidden=true;$("xNote").hidden=true;
+  try{
+    const {a}=apiArgs();const from=+$("xFrom").value||2025;const now=new Date();const no=$("xTab").value;
+    st.textContent="e-Statでファイルを探しています…";
+    const root=await getJ("getDataCatalog",`${a}&statsCode=00600120&surveyYears=${from-1}01-${now.getFullYear()}12&dataType=XLS&limit=5000&searchWord=${encodeURIComponent("都道府県別")}`);
+    XFILES=catalogFiles(root,no).filter(f=>+f.t.slice(0,4)>=from-1);
+    if(!XFILES.length)throw new Error("該当するExcelが見つかりませんでした。開始年や表を変えてお試しください。");
+    $("xList").innerHTML=XFILES.map(f=>`<a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.t.slice(0,4)}年${+f.t.slice(5)}月</a>`).join("");
+    $("xLoad").hidden=false;$("xNote").hidden=false;
+    st.textContent=`${XFILES.length}か月分（${XFILES[0].t.replace("-","年")}月〜${XFILES[XFILES.length-1].t.replace("-","年")}月）。前年同期比のため開始年の前年分も含めています。`;
+  }catch(e){if(e instanceof TypeError){st.className="status err";st.textContent="e-Stat に接続できませんでした。GitHub Pagesに置いたページで開いてください。"}else{st.className="status err";st.textContent=e.message}}
+  finally{$("xFind").disabled=false}
+});
+$("xLoad").addEventListener("click",async()=>{
+  const st=$("xStatus");st.className="status";$("xLoad").disabled=true;
+  try{
+    const X=await loadXLSX();let all=[];
+    for(let i=0;i<XFILES.length;i++){const f=XFILES[i];
+      st.textContent=`読み込み中… ${f.t.replace("-","年")}月（${i+1}/${XFILES.length}）`;
+      const res=await fetch(f.url);if(!res.ok)throw new Error("HTTP "+res.status);
+      const wb=X.read(await res.arrayBuffer(),{type:"array"});
+      for(const n of wb.SheetNames){try{all=all.concat(rowsToRecords(X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:""}),f.t))}catch(e){}}}
+    if(!all.length)throw new Error("Excelから数値を読み取れませんでした。");
+    const add=$("appendChk").checked&&SRC&&SRC.kind!=="demo"&&SRC.recs;
+    setSource(buildSource(add?SRC.recs.concat(all):all,`e-Stat 表${$("xTab").value}（月次Excel）`,"file"),false);
+    st.textContent=`${XFILES.length}か月分を読み込みました。`;
+  }catch(e){st.className="status err";
+    st.textContent=(e instanceof TypeError)?"e-Statのファイルはアプリから直接読み込めませんでした（ブラウザの制限）。月のボタンで保存し、「ファイルを選ぶ」から選んでください。":"読み込めませんでした："+e.message}
+  finally{$("xLoad").disabled=false}
+});
 let rz;let lastW=0;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{const w=$("trend").clientWidth;if(SRC&&w!==lastW){lastW=w;renderTrend(selKey(S.sel),SRC.unit(selKey(S.sel)))}},150)});
 $("tabbar").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const t=$(b.dataset.t);if(t.tagName==="DETAILS")t.open=true;t.scrollIntoView({behavior:"smooth",block:"start"})});
 if("IntersectionObserver" in window){const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting)for(const b of $("tabbar").querySelectorAll("button"))b.setAttribute("aria-current",String(b.dataset.t===e.target.id))},{rootMargin:"-40% 0px -55% 0px"});["secCond","secMap","secTable","secTrend","dataPanel"].forEach(id=>io.observe($(id)))}
