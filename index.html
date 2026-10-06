@@ -1198,9 +1198,19 @@ $("xFind").addEventListener("click",async()=>{
   const st=$("xStatus");st.className="status";$("xFind").disabled=true;$("xList").innerHTML="";$("xLoad").hidden=true;$("xNote").hidden=true;
   try{
     const {a}=apiArgs();const from=+$("xFrom").value||2025;const now=new Date();const no=$("xTab").value;
-    st.textContent="e-Statでファイルを探しています…";
-    const root=await getJ("getDataCatalog",`${a}&statsCode=00600120&surveyYears=${from-1}01-${now.getFullYear()}12&dataType=XLS&limit=100&searchWord=${encodeURIComponent("都道府県別")}`);
-    XFILES=catalogFiles(root,no).filter(f=>+f.t.slice(0,4)>=from-1);
+    const KW={"18":"建て方別","4-1":"階数別","16":"都道府県別","15":"都道府県別","5":"都道府県別","6-1":"都道府県別","7-1":"都道府県別"};
+    const base=`${a}&statsCode=00600120&surveyYears=${from-1}01-${now.getFullYear()}12&dataType=XLS&limit=100`;
+    const collect=async(kw)=>{const found=new Map();let pos=1;
+      for(let pg=0;pg<20;pg++){
+        st.textContent=`e-Statでファイルを探しています…（${pg+1}ページ目）`;
+        const root=await getJ("getDataCatalog",`${base}&startPosition=${pos}${kw?"&searchWord="+encodeURIComponent(kw):""}`);
+        for(const f of catalogFiles(root,no))if(!found.has(f.t)||f.url>found.get(f.t).url)found.set(f.t,f);
+        const nk=root.DATA_CATALOG_LIST_INF&&root.DATA_CATALOG_LIST_INF.RESULT_INF&&root.DATA_CATALOG_LIST_INF.RESULT_INF.NEXT_KEY;
+        if(!nk)break;pos=nk}
+      return [...found.values()]};
+    let files=await collect(KW[no]||"");
+    if(!files.length)files=await collect("");
+    XFILES=files.filter(f=>+f.t.slice(0,4)>=from-1).sort((x,y)=>x.t<y.t?-1:1);
     if(!XFILES.length)throw new Error("該当するExcelが見つかりませんでした。開始年や表を変えてお試しください。");
     $("xList").innerHTML=XFILES.map(f=>`<a href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc(f.name)}">${f.t.slice(0,4)}年${+f.t.slice(5)}月</a>`).join("");
     $("xLoad").hidden=false;$("xNote").hidden=false;
