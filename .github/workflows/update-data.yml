@@ -20,8 +20,13 @@ jobs:
         with:
           node-version: 20
       - run: npm install --no-save jsdom@24 xlsx@0.18.5
-      - run: node scripts/update-data.mjs
+      - name: Update
+        run: |
+          set -o pipefail
+          mkdir -p data
+          node scripts/update-data.mjs 2>&1 | tee data/update.log
       - name: Commit
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
