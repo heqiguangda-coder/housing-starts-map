@@ -132,6 +132,11 @@ details.data[open]>summary::after{content:"－"}
 .xlist a{display:flex;align-items:center;justify-content:center;gap:4px;min-height:40px;border:1px solid var(--line);border-radius:4px;text-decoration:none;color:var(--ink);background:var(--sunk);font-size:13px;font-weight:700}
 .xlist a::before{content:"";width:14px;height:14px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10l5 5 5-5M4 20h16'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10l5 5 5-5M4 20h16'/%3E%3C/svg%3E") center/contain no-repeat}
 .xlist a:visited{color:var(--muted)}
+.rlist{display:grid;gap:6px}
+.rrow{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:13px}
+.rrow .btn{flex:none}
+.repo{border:1.5px solid var(--accent);border-radius:8px;padding:12px}
+.newbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--sunk);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;font-size:13px}
 .drop{border:1.5px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);font-size:13px;display:grid;gap:8px;justify-items:center}
 .drop.over{border-color:var(--accent);background:var(--sunk)}
 .status{font-size:12.5px;min-height:1.4em}
@@ -222,6 +227,7 @@ section[id],details[id]{scroll-margin-top:12px}
     </div>
   </header>
 
+  <div class="newbar" id="newBar" hidden><span id="newTxt"></span><button class="btn primary" type="button" id="newBtn">最新月を読み込む</button></div>
   <div class="warn" id="demoWarn" hidden>表示中の数値は操作確認用の<b>架空データ</b>です。「データを読み込む」から e-Stat のデータを取り込むと実数で集計します。</div>
 
   <section class="panel controls" id="secCond" aria-label="集計条件">
@@ -316,6 +322,15 @@ section[id],details[id]{scroll-margin-top:12px}
   <details class="data" id="dataPanel">
     <summary><span>データの読み込み</span><span class="note" id="dataSummary"></span></summary>
     <div class="datagrid">
+      <section class="repo">
+        <h3>自動更新データ（おすすめ）</h3>
+        <p>国交省の月次Excelを毎日自動で取り込み、このサイトに保存しています。ボタン1つで最新月まで読み込めます（アプリケーションID不要）。</p>
+        <div class="row">
+          <div class="fld"><label for="rFrom">開始年</label><select id="rFrom"></select></div>
+        </div>
+        <div class="rlist" id="rList"><p class="note" style="margin:0">読み込み中…</p></div>
+        <div class="status" id="rStatus"></div>
+      </section>
       <section>
         <h3>e-Stat のファイルを読み込む</h3>
         <ol>
@@ -1287,7 +1302,7 @@ async function persist(src){
 async function switchDataset(key){
   if(key==="__demo"){META.active=null;await saveMeta();setSource(makeDemo(),true);showSaved("");return}
   try{const p=await IDB.get("ds:"+key);if(!p||!(p.arr||p.idx))throw 0;const src=unpackSource(p);src.key=key;setSource(src,true,true);
-    META.active=key;await saveMeta();showSaved(`保存した「${src.label}」を表示しています（${fmtDT(src.savedAt)} 保存）。`)}
+    META.active=key;await saveMeta();showSaved(`保存した「${src.label}」を表示しています（${fmtDT(src.savedAt)} 保存）。`);checkNewMonth()}
   catch(e){showSaved("保存データを開けませんでした。");}
 }
 async function deleteDataset(key){
@@ -1303,6 +1318,49 @@ function renderDsList(){
   $("dsWrap").hidden=!META.list.length;
   $("dsList").innerHTML=META.list.length?META.list.map(x=>`<div class="dsrow${SRC&&SRC.key===x.key?" on":""}"><div><b>${esc(x.label)}</b><br><span class="note">${esc(x.range||"")}　${fmtDT(x.savedAt)} 保存</span></div><div class="row" style="gap:6px"><button type="button" class="btn" data-open="${esc(x.key)}">表示</button><button type="button" class="btn" data-del="${esc(x.key)}">削除</button></div></div>`).join(""):`<p class="note" style="margin:0">保存したデータはまだありません。</p>`;
 }
+/* 自動更新データ（GitHub上の data/） */
+let RIDX=null;
+const REPO_KEY={h15:"表15",h16:"表16",h18:"表18","b4-1":"表4-1",b5:"表5","b6-1":"表6-1","b7-1":"表7-1"};
+async function loadRepoIndex(){
+  try{const r=await fetch("data/index.json",{cache:"no-cache"});if(!r.ok)throw 0;RIDX=await r.json()}catch(e){RIDX=null}
+  const list=$("rList");
+  if(!RIDX||!RIDX.tables){list.innerHTML=`<p class="note" style="margin:0">このページでは使えません。GitHub Pages版（heqiguangda-coder.github.io/housing-starts-map/）で開くと使えます。</p>`;$("rFrom").disabled=true;return}
+  const all=Object.values(RIDX.tables).flatMap(t=>Object.keys(t.months||{}));const ys=[...new Set(all.map(t=>+t.slice(0,4)))].sort();
+  const def=Math.max(ys[0]+1,ys[ys.length-1]-1);
+  $("rFrom").innerHTML=ys.slice(1).map(y=>`<option value="${y}"${y===def?" selected":""}>${y}年（前年分も読み込み）</option>`).join("")||ys.map(y=>`<option value="${y}">${y}年</option>`).join("");
+  list.innerHTML=Object.entries(RIDX.tables).filter(([k,t])=>Object.keys(t.months||{}).length).map(([k,t])=>{const ms=Object.keys(t.months).sort();
+    return `<div class="rrow"><div><b>${esc(t.label)}</b><br><span class="note">${ms[0].replace("-","年")}月〜${ms[ms.length-1].replace("-","年")}月（${ms.length}か月）</span></div><button type="button" class="btn primary" data-rk="${esc(k)}">読み込む</button></div>`}).join("")+
+    (RIDX.updated?`<p class="note" style="margin:0">最終更新：${fmtDT(Date.parse(RIDX.updated))}　出典：国土交通省「建築着工統計調査」（e-Stat）</p>`:"");
+  checkNewMonth();
+}
+async function loadRepoTable(k,fromY,silent){
+  const t=RIDX.tables[k];const st=$("rStatus");st.className="status";
+  const ms=Object.keys(t.months).filter(m=>+m.slice(0,4)>=fromY-1).sort();
+  if(!ms.length){st.className="status err";st.textContent="指定の期間にデータがありません。";return}
+  const recs=[];let done=0;
+  const one=async m=>{const r=await fetch(t.months[m].file+"?id="+t.months[m].id);if(!r.ok)throw new Error(m+" の取得に失敗しました");const p=await r.json();
+    const n=p.names.length;for(let o=0;o<p.rows.length;o+=p.w){const dims={};for(let j=0;j<n;j++){const x=p.rows[o+j];if(x>=0)dims[p.names[j]]=p.vals[j][x]}
+      recs.push({dims,pref:p.rows[o+n],t:p.t,unit:p.units[p.rows[o+n+1]],v:p.rows[o+n+2],sparse:1})}
+    done++;st.textContent=`読み込み中… ${done}/${ms.length}か月`};
+  try{
+    for(let i=0;i<ms.length;i+=6)await Promise.all(ms.slice(i,i+6).map(one));
+    const key=REPO_KEY[k]||t.key;
+    $("appendChk").checked=false;
+    const src=await loadDataset(recs,key,t.label,"repo");src.repo={k,fromY,last:ms[ms.length-1]};
+    try{const all=JSON.parse(localStorage.getItem("hs.repoSel")||"{}");all[key]={k,fromY};localStorage.setItem("hs.repoSel",JSON.stringify(all))}catch(e){}
+    st.textContent=`「${t.label}」を読み込みました（${ms[0].replace("-","年")}月〜${ms[ms.length-1].replace("-","年")}月、${nf.format(recs.length)}件）。`;
+    $("newBar").hidden=true;
+  }catch(e){st.className="status err";st.textContent=e.message}
+}
+function checkNewMonth(){
+  if(!RIDX||!SRC||SRC.kind==="demo")return;
+  let sel={};try{sel=JSON.parse(localStorage.getItem("hs.repoSel")||"{}")}catch(e){}
+  const info=sel[SRC.key];if(!info||!RIDX.tables[info.k])return;
+  const ms=Object.keys(RIDX.tables[info.k].months).sort();const last=ms[ms.length-1];const have=SRC.months[SRC.months.length-1];
+  if(last&&have&&last>have){$("newTxt").textContent=`「${RIDX.tables[info.k].label}」に新しい月（${last.replace("-","年")}月）が公表されています。`;$("newBar").hidden=false;$("newBtn").onclick=()=>loadRepoTable(info.k,info.fromY)}
+  else $("newBar").hidden=true;
+}
+$("rList").addEventListener("click",e=>{const b=e.target.closest("[data-rk]");if(b)loadRepoTable(b.dataset.rk,+$("rFrom").value||new Date().getFullYear()-1)});
 let rz;let lastW=0;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{const w=$("trend").clientWidth;if(SRC&&w!==lastW){lastW=w;renderTrend(selKey(S.sel),SRC.unit(selKey(S.sel)))}},150)});
 $("tabbar").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const t=$(b.dataset.t);if(t.tagName==="DETAILS")t.open=true;t.scrollIntoView({behavior:"smooth",block:"start"})});
 if("IntersectionObserver" in window){const io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting)for(const b of $("tabbar").querySelectorAll("button"))b.setAttribute("aria-current",String(b.dataset.t===e.target.id))},{rootMargin:"-40% 0px -55% 0px"});["secCond","secMap","secTable","secTrend","dataPanel"].forEach(id=>io.observe($(id)))}
@@ -1320,6 +1378,7 @@ buildMap();
   }catch(e){}
   if(META.active&&META.list.some(x=>x.key===META.active))await switchDataset(META.active);
   else{setSource(makeDemo(),true);renderDsList()}
+  loadRepoIndex();
 })();
 </script>
 

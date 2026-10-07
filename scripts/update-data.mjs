@@ -103,7 +103,7 @@ for (const set of SETS) {
     const page = await get(`${BASE}/stat-search/files?layout=datalist&cycle=1&toukei=00600120&tstat=${set.tstat}&tclass1val=0&year=${y}0&month=${code}&result_back=1`);
     const found = {};
     for (const b of page.split("stat-dataset_list-item").slice(1)) {
-      const text = z2h(b.replace(/<[^>]+>/g, " ").replace(/\s+/g, " "));
+      const text = z2h(b.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " "));
       const no = (text.match(/表番号\s*(\d+(?:\s*-\s*\d+)?)/) || [])[1];
       const id = (b.match(/statInfId=(\d+)&(?:amp;)?fileKind=0/) || [])[1];
       if (no && id) found[no.replace(/\s+/g, "")] = id;
