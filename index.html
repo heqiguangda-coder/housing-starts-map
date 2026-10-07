@@ -188,6 +188,7 @@ section[id],details[id]{scroll-margin-top:12px}
   .seg button{flex:1 0 auto;white-space:nowrap;padding:10px 12px;font-size:14px}
   .panel h2 .seg button{padding:7px 12px}
   #modeSeg,#metricSeg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;overflow:visible}
+  #modeSeg button{font-size:13px}
   #modeSeg button,#metricSeg button{padding:10px 2px}
   .btn{min-height:40px;font-size:14px}
   .dims{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -239,10 +240,13 @@ section[id],details[id]{scroll-margin-top:12px}
           <button type="button" data-v="ttm"><span class="hide-sm">直近</span>12ヶ月</button>
           <button type="button" data-v="year">暦年</button>
           <button type="button" data-v="fy">年度</button>
+          <button type="button" data-v="range">期間<span class="hide-sm">指定</span></button>
         </div>
       </div>
-      <div class="fld"><label for="ySel">年</label><select id="ySel"></select></div>
-      <div class="fld" id="mWrap"><label for="mSel">月</label><select id="mSel"></select></div>
+      <div class="fld" id="syWrap" hidden><label for="sySel">開始年</label><select id="sySel"></select></div>
+      <div class="fld" id="smWrap" hidden><label for="smSel">開始月</label><select id="smSel"></select></div>
+      <div class="fld"><label for="ySel" id="yLab">年</label><select id="ySel"></select></div>
+      <div class="fld" id="mWrap"><label for="mSel" id="mLab">月</label><select id="mSel"></select></div>
       <div class="fld"><span class="lbl">地図の色分け</span>
         <div class="seg" id="metricSeg" role="group" aria-label="地図の色分け">
           <button type="button" data-v="yoy">前年同期比</button>
@@ -680,6 +684,15 @@ function estatToRecords(json,fbT){
 let SRC=null;
 const S={mode:"month",Y:0,M:1,metric:"yoy",area:0,trend:"m",bd:"",sel:{},sortK:"yoy",sortD:-1};
 const selKey=sel=>SRC.dims.map(d=>sel[d.name]).join(SEP);
+// 期間指定：開始（S.SY,S.SM）と終了（S.Y,S.M）から月数を求める
+function syncSpan(){
+  if(S.SY==null){S.SY=S.Y;S.SM=1}
+  let sp=(S.Y*12+S.M)-(S.SY*12+S.SM)+1;
+  if(sp<1){S.SY=S.Y;S.SM=S.M;sp=1}
+  if(sp>60){sp=60;setStartFromSpan(sp)}
+  S.span=sp;
+}
+function setStartFromSpan(sp){let y=S.Y,m=S.M-(sp-1);while(m<1){m+=12;y--}S.SY=y;S.SM=m}
 function periodMonths(mode,Y,M){
   const a=[];
   if(mode==="month")a.push(ym(Y,M));
@@ -687,11 +700,12 @@ function periodMonths(mode,Y,M){
   else if(mode==="year")for(let m=1;m<=12;m++)a.push(ym(Y,m));
   else if(mode==="fy"){for(let m=4;m<=12;m++)a.push(ym(Y,m));for(let m=1;m<=3;m++)a.push(ym(Y+1,m))}
   else if(mode==="ttm"){let y=Y,m=M;for(let i=0;i<12;i++){a.unshift(ym(y,m));m--;if(!m){m=12;y--}}}
+  else if(mode==="range"){let y=Y,m=M;const n=Math.max(1,S.span||1);for(let i=0;i<n;i++){a.unshift(ym(y,m));m--;if(!m){m=12;y--}}}
   return a;
 }
 const memo=new Map();
 function aggP(sel,p,mode,Y,M){
-  const k=sel+"|"+p+"|"+mode+Y+"-"+M;if(memo.has(k))return memo.get(k);
+  const k=sel+"|"+p+"|"+mode+(mode==="range"?S.span:"")+"|"+Y+"-"+M;if(memo.has(k))return memo.get(k);
   let r=null;
   if(mode==="year"&&SRC.annual.length&&SRC.get(sel,p,String(Y))!==undefined)r=SRC.get(sel,p,String(Y));
   else if(mode==="fy"&&SRC.fys.length&&SRC.get(sel,p,"FY"+Y)!==undefined)r=SRC.get(sel,p,"FY"+Y);
@@ -715,7 +729,9 @@ function periodLabel(mode,Y,M){
   if(mode==="ytd")return M===1?`${Y}年1月`:`${Y}年1〜${M}月`;
   if(mode==="year")return `${Y}年`;
   if(mode==="fy")return `${Y}年度`;
-  const a=periodMonths("ttm",Y,M)[0];return `${a.slice(0,4)}年${+a.slice(5)}月〜${Y}年${M}月`;
+  const a=periodMonths(mode==="range"?"range":"ttm",Y,M)[0];const ay=+a.slice(0,4),am=+a.slice(5);
+  if(mode==="range"&&ay===Y)return am===M?`${Y}年${M}月`:`${Y}年${am}〜${M}月`;
+  return `${ay}年${am}月〜${Y}年${M}月`;
 }
 function hasPeriod(mode,Y,M){
   if(mode==="year"&&SRC.annual.includes(String(Y)))return true;
@@ -760,7 +776,7 @@ function segInit(id,key,cb){
   $(id).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;S[key]=b.dataset.v;cb&&cb();save();render()});
 }
 function segSync(id,val){for(const b of $(id).querySelectorAll("button"))b.setAttribute("aria-pressed",String(b.dataset.v===val))}
-function save(){store.set("view",{mode:S.mode,metric:S.metric,trend:S.trend,sel:S.sel,bd:S.bd})}
+function save(){store.set("view",{mode:S.mode,metric:S.metric,trend:S.trend,sel:S.sel,bd:S.bd,span:S.mode==="range"?S.span:undefined})}
 
 function setSource(src,keepView,fromSave){
   SRC=src;memo.clear();
@@ -774,11 +790,13 @@ function setSource(src,keepView,fromSave){
     if(!v&&/工事/.test(d.name))v=d.values.find(x=>x==="新設");
     if(!v)v=d.values.find(x=>/^(総数|計|合計|総計|全体|総)$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values.find(x=>/床面積/.test(x))||d.values[0];
     S.sel[d.name]=v}
-  if(saved){S.metric=saved.metric||S.metric;S.trend=saved.trend||S.trend;S.mode=saved.mode||S.mode}
-  if(!SRC.months.length&&["month","ytd","ttm"].includes(S.mode))S.mode=SRC.fys.length&&!SRC.annual.length?"fy":"year";
+  if(saved){S.metric=saved.metric||S.metric;S.trend=saved.trend||S.trend;S.mode=saved.mode||S.mode;if(saved.span)S.span=saved.span}
+  if(S.mode==="range"&&!S.span)S.span=12;
+  if(!SRC.months.length&&["month","ytd","ttm","range"].includes(S.mode))S.mode=SRC.fys.length&&!SRC.annual.length?"fy":"year";
   let lp=latestPeriod(S.mode);
   if(!lp)for(const m of ["month","ytd","ttm","year","fy"]){lp=latestPeriod(m);if(lp){S.mode=m;break}}
   if(lp){S.Y=lp[0];S.M=lp[1]}
+  if(S.mode==="range"){setStartFromSpan(S.span);syncSpan()}
   const multi=SRC.dims.filter(d=>d.values.length>1);
   S.bd=saved&&multi.some(d=>d.name===saved.bd)?saved.bd:(multi.find(d=>/利用関係/.test(d.name))||multi[0]||{}).name||"";
   S.area=0;
@@ -854,6 +872,7 @@ function buildDims(){
 }
 function buildYears(){
   const ys=allYears();$("ySel").innerHTML=ys.map(y=>`<option value="${y}">${y}年</option>`).join("");
+  $("sySel").innerHTML=$("ySel").innerHTML;$("smSel").innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}月</option>`).join("");
   $("mSel").innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${i+1}月</option>`).join("");
 }
 
@@ -861,11 +880,19 @@ function buildYears(){
 function render(){
   if(!SRC)return;
   segSync("modeSeg",S.mode);segSync("metricSeg",S.metric);segSync("trendSeg",S.trend);
+  if(S.mode==="range")syncSpan();
+  const RG=S.mode==="range";
+  $("syWrap").hidden=!RG;$("smWrap").hidden=!RG;$("yLab").textContent=RG?"終了年":"年";$("mLab").textContent=RG?"終了月":"月";
+  if(RG){$("sySel").value=S.SY;$("smSel").value=S.SM}
   $("ySel").value=S.Y;$("mSel").value=S.M;$("mWrap").hidden=S.mode==="year"||S.mode==="fy";
   const sel=selKey(S.sel);const unit=SRC.unit(sel);
   const ratioDim=Object.values(S.sel).some(v=>/あたり|平均|単価|率/.test(v));
-  $("sumWarn").hidden=!(ratioDim&&S.mode!=="month");
-  $("sumWarn").textContent="選択中の指標は比率・平均値のため、複数月の合計には意味がありません。集計期間は「単月」を選んでください。";
+  const w=[];
+  if(ratioDim&&!(S.mode==="month"||(RG&&S.span===1)))w.push("選択中の指標は比率・平均値のため、複数月の合計には意味がありません。集計期間は「単月」を選んでください。");
+  if(RG&&S.span>12)w.push(`期間が${S.span}か月あり12か月を超えるため、比較する前年同期間と一部の月が重なります。`);
+  if(RG&&!hasPeriod("range",S.Y,S.M))w.push("指定した期間に読み込んでいない月があるため、集計できません。期間を変えるか、データを追加してください。");
+  else if(RG&&!hasPeriod("range",S.Y-1,S.M))w.push("前年同期間に読み込んでいない月があるため、前年比を出せません。前年分のデータも読み込んでください。");
+  $("sumWarn").hidden=!w.length;$("sumWarn").textContent=w.join(" ");
   const pl=periodLabel(S.mode,S.Y,S.M),pp=periodLabel(S.mode,S.Y-1,S.M);
   const what=SRC.dims.filter(d=>d.values.length>1).map(d=>S.sel[d.name]).filter(v=>!/^(総数|計)$/.test(v)).join("・")||"総数";
   $("subtitle").textContent=`${pl}　${what}　（比較：${pp}）`;
@@ -1029,11 +1056,15 @@ $("crFocus").addEventListener("change",e=>{S.crFocus=e.target.value;render()});
 function selectArea(p){S.area=S.area===p?0:p;render()}
 
 /* ---------- 入力 ---------- */
-segInit("modeSeg","mode",()=>{if(!hasPeriod(S.mode,S.Y,S.M)){const lp=latestPeriod(S.mode);if(lp){S.Y=lp[0];S.M=lp[1]}}});
+segInit("modeSeg","mode",()=>{
+  if(S.mode==="range"){S.SY=S.Y;S.SM=1;syncSpan()} // 初期値：終了月の年の1月から
+  if(!hasPeriod(S.mode,S.Y,S.M)){const lp=latestPeriod(S.mode);if(lp){S.Y=lp[0];S.M=lp[1];if(S.mode==="range"){setStartFromSpan(S.span);syncSpan()}}}});
 segInit("metricSeg","metric");
 segInit("trendSeg","trend");
-$("ySel").addEventListener("change",e=>{S.Y=+e.target.value;render()});
-$("mSel").addEventListener("change",e=>{S.M=+e.target.value;render()});
+$("ySel").addEventListener("change",e=>{S.Y=+e.target.value;if(S.mode==="range"){syncSpan();save()}render()});
+$("mSel").addEventListener("change",e=>{S.M=+e.target.value;if(S.mode==="range"){syncSpan();save()}render()});
+$("sySel").addEventListener("change",e=>{S.SY=+e.target.value;syncSpan();save();render()});
+$("smSel").addEventListener("change",e=>{S.SM=+e.target.value;syncSpan();save();render()});
 $("dims").addEventListener("change",e=>{const s=e.target.closest("select");if(!s)return;S.sel[s.dataset.dim]=s.value;save();render()});
 $("bdDim").addEventListener("change",e=>{S.bd=e.target.value;save();render()});
 $("tbl").addEventListener("click",e=>{const b=e.target.closest("th button");if(b){const k=b.dataset.k;if(S.sortK===k)S.sortD*=-1;else{S.sortK=k;S.sortD=k==="p"?1:-1}render();return}
