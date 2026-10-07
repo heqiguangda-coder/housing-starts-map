@@ -764,6 +764,7 @@ function save(){store.set("view",{mode:S.mode,metric:S.metric,trend:S.trend,sel:
 
 function setSource(src,keepView,fromSave){
   SRC=src;memo.clear();
+  if(!keepView&&S.metric==="share")S.metric="yoy";
   if(src.kind!=="demo"&&!fromSave)persist(src);
   setTimeout(()=>{try{renderDsList()}catch(e){}},0);
   const saved=keepView?store.get("view"):null;
@@ -870,6 +871,7 @@ function render(){
   $("subtitle").textContent=`${pl}　${what}　（比較：${pp}）`;
   $("unitNote").textContent=unit?"単位："+unit:"";
   const sd=shareDim();$("shareBtn").disabled=!sd;$("shareBtn").title=sd?`${sd.name}の計に対する「${S.sel[sd.name]}」の割合`:"構造などで「計」以外（例：木造）を選ぶと使えます";
+  if(S.metric==="share"&&!sd)S.metric="yoy";segSync("metricSeg",S.metric);
   const SH=S.metric==="share"&&!!sd;LAST.share=SH?{dim:sd.name,val:S.sel[sd.name]}:null;
   const rows=[];
   if(SH){const den=selKey({...S.sel,[sd.name]:"計"});
