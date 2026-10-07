@@ -1,0 +1,23 @@
+name: fetch-sample
+on:
+  push:
+    paths: [".github/workflows/fetch-sample.yml"]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p sample
+          UA="Mozilla/5.0"
+          curl -sSL -A "$UA" -o sample/list_jutaku.html "https://www.e-stat.go.jp/stat-search/files?toukei=00600120&tstat=000001016966&cycle=1&layout=datalist"
+          curl -sSL -A "$UA" -o sample/list_jutaku_2025.html "https://www.e-stat.go.jp/stat-search/files?layout=datalist&toukei=00600120&tstat=000001016966&cycle=1&year=20250&tclass1val=0"
+          curl -sSL -A "$UA" -o sample/month_jutaku_202604.html "https://www.e-stat.go.jp/stat-search/files?page=1&layout=datalist&toukei=00600120&tstat=000001016966&cycle=1&year=20260&month=12040604&result_back=1&tclass1val=0"
+          curl -sSL -A "$UA" -o sample/list_kenchiku.html "https://www.e-stat.go.jp/stat-search/files?toukei=00600120&tstat=000001016965&cycle=1&layout=datalist"
+          ls -la sample
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sample && git commit -m "sample: e-Stat list pages" && git push
