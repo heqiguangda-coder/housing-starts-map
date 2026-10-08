@@ -4,6 +4,7 @@
 
 - 公開URL: https://heqiguangda-coder.github.io/housing-starts-map/
 - 初期表示は操作確認用の架空データです
+- バージョン：`VERSION` に記載（アプリ名の横と「データ」タブに表示）。変更内容は [CHANGELOG.md](CHANGELOG.md)、過去の版は `releases/housing-starts-map_ver.N.N.N.html`
 
 ## データ
 
