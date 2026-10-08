@@ -16,7 +16,8 @@ const SETS = [
     "15": { k: "h15", pref: true, city: true }, "16": { k: "h16", pref: true, city: true }, "18": { k: "h18", pref: true, city: true } } },
   { tstat: "000001016965", name: "建築物着工統計", tables: {
     "4-1": { k: "b4-1", pref: true }, "5": { k: "b5", pref: true }, "6-1": { k: "b6-1", pref: true }, "7-1": { k: "b7-1", pref: true },
-    "6-2-1": { k: "b6-1", city: true }, "7-2-1": { k: "b7-1", city: true } } },
+    "6-2-1": { k: "b6-1", city: true }, "7-2-1": { k: "b7-1", city: true },
+    "6-2": { k: "b6-1", city: true }, "7-2": { k: "b7-1", city: true } } }, // 2024年以前は「6-2」「7-2」
 ];
 const META = {
   h15: { key: "表15", label: "表15 都道府県別・利用関係別" },

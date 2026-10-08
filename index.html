@@ -472,8 +472,8 @@ section[id],details[id]{scroll-margin-top:12px}
         <div class="dslist" id="dsList"></div>
         <button class="btn" id="demoBtn" type="button">保存データをすべて消して架空データに戻す</button>
         <h3 style="margin-top:8px">バージョン</h3>
-        <p style="margin:0">ver.1.15.0（）</p>
-        <ul class="vhist"><li><b>ver.1.14.0</b> アプリ名とファイル名にバージョンを表示、変更履歴を追加</li><li><b>ver.1.13.0</b> 集計期間に「期間指定」（開始年月〜終了年月を前年同期間と比較）</li><li><b>ver.1.12.0</b> 月次Excelを毎日自動取得する「自動更新データ」と新しい月の通知</li><li><b>ver.1.11.1</b> 月次Excelの検索で表18・表4-1が見つからない不具合を修正</li><li><b>ver.1.11.0</b> e-Stat APIで建築物の表（表4・5・6-1・7-1）を取得</li><li><b>ver.1.10.0</b> 表4-1（用途×階数×構造）、非住宅（D〜R）、構成比（木造率）、クロス集計</li><li><b>ver.1.9.0</b> 建築物の表5・6-1・7-1の読み込み</li><li><b>ver.1.8.0</b> 表18（構造別・建て方別）の読み込み</li><li><b>ver.1.7.0</b> 表ごとに複数のデータを保存し切り替え</li><li><b>ver.1.6.0</b> 区分の用語説明（？ボタン）</li><li><b>ver.1.5.1</b> 表15・表16のExcel読み取り（市部・郡部の上書き）を修正</li><li><b>ver.1.5.0</b> 読み込んだデータを端末に保存</li><li><b>ver.1.4.1</b> APIのlimitエラーとiPhoneでの表示崩れを修正</li><li><b>ver.1.4.0</b> 月次Excelのダウンロードボタン</li><li><b>ver.1.3.0</b> 国交省の月次Excelの読み込み</li><li><b>ver.1.2.0</b> e-Stat APIで月次表を集めて取得</li><li><b>ver.1.1.0</b> iPhone向けの画面</li><li><b>ver.1.0.0</b> 初版（都道府県別の表と色分け地図、前年同期比）</li></ul>
+        <p style="margin:0">ver.1.15.0（2026-10-08）</p>
+        <ul class="vhist"><li><b>ver.1.15.0</b> 市区町村別の集計（表15・16・18・6-1・7-1、2024年1月分から）、集計結果のWord出力（地図画像・一覧・AI分析用の説明つき）</li><li><b>ver.1.14.0</b> アプリ名とファイル名にバージョンを表示、変更履歴を追加</li><li><b>ver.1.13.0</b> 集計期間に「期間指定」（開始年月〜終了年月を前年同期間と比較）</li><li><b>ver.1.12.0</b> 月次Excelを毎日自動取得する「自動更新データ」と新しい月の通知</li><li><b>ver.1.11.1</b> 月次Excelの検索で表18・表4-1が見つからない不具合を修正</li><li><b>ver.1.11.0</b> e-Stat APIで建築物の表（表4・5・6-1・7-1）を取得</li><li><b>ver.1.10.0</b> 表4-1（用途×階数×構造）、非住宅（D〜R）、構成比（木造率）、クロス集計</li><li><b>ver.1.9.0</b> 建築物の表5・6-1・7-1の読み込み</li><li><b>ver.1.8.0</b> 表18（構造別・建て方別）の読み込み</li><li><b>ver.1.7.0</b> 表ごとに複数のデータを保存し切り替え</li><li><b>ver.1.6.0</b> 区分の用語説明（？ボタン）</li><li><b>ver.1.5.1</b> 表15・表16のExcel読み取り（市部・郡部の上書き）を修正</li><li><b>ver.1.5.0</b> 読み込んだデータを端末に保存</li><li><b>ver.1.4.1</b> APIのlimitエラーとiPhoneでの表示崩れを修正</li><li><b>ver.1.4.0</b> 月次Excelのダウンロードボタン</li><li><b>ver.1.3.0</b> 国交省の月次Excelの読み込み</li><li><b>ver.1.2.0</b> e-Stat APIで月次表を集めて取得</li><li><b>ver.1.1.0</b> iPhone向けの画面</li><li><b>ver.1.0.0</b> 初版（都道府県別の表と色分け地図、前年同期比）</li></ul>
         <h3 style="margin-top:8px">出典と注意</h3>
         <p>原典：国土交通省「<a href="https://www.mlit.go.jp/sogoseisaku/jouhouka/sosei_jouhouka_tk4_000002.html" target="_blank" rel="noopener">建築着工統計調査</a>」（毎月末頃に前月分を公表）、<a href="https://www.e-stat.go.jp/stat-search/database?toukei=00600120" target="_blank" rel="noopener">e-Stat</a>。統計表の「−」は0、「…」「x」は欠測として扱います。累計・年計は月次値の合計で、期間内に欠測月があると表示しません。1戸あたり工事費など比率の指標は合計できないため単月で見てください。</p>
       </section>
@@ -1220,7 +1220,8 @@ function summaryText(F){
   const n=F.rows[0],u=F.unit?F.unit:"";const what=F.conds.filter(([k,v])=>v!=="計"&&!/表章/.test(k)).map(([k,v])=>v).join("・")||"総数";
   const item=(F.conds.find(([k])=>/表章/.test(k))||[,""])[1];
   const L=[];
-  if(F.SH){L.push(`${F.pl}の全国の${LAST.share.val}の構成比は${fmtPct(n.cur)}で、前年同期（${F.pp}）の${fmtPct(n.prev)}から${fmtPt(n.diff)}でした。`);
+  const ctx=F.conds.filter(([k,v])=>v!=="計"&&!/表章/.test(k)&&(!F.SH||k!==LAST.share.dim)).map(([k,v])=>v).join("・");
+  if(F.SH){L.push(`${F.pl}の全国の${ctx?ctx+"のうち、":""}${LAST.share.val}の構成比（${item||"実数"}ベース）は${fmtPct(n.cur)}で、前年同期（${F.pp}）の${fmtPct(n.prev)}から${fmtPt(n.diff)}でした。`);
     L.push(`構成比が前年より上がった都道府県は${F.up}、下がった都道府県は${F.down}です。`);
     const hi=F.rows.slice(1).filter(r=>r.cur!==null).sort((a,b)=>b.cur-a.cur);if(hi.length)L.push(`構成比が最も高いのは${PREFS[hi[0].p]}（${fmtPct(hi[0].cur)}）、最も低いのは${PREFS[hi[hi.length-1].p]}（${fmtPct(hi[hi.length-1].cur)}）です。`)}
   else{L.push(`${F.pl}の全国の${what}${item?"（"+item+"）":""}は${fmt(n.cur)}${u}で、前年同期（${F.pp}）の${fmt(n.prev)}${u}に比べ${fmtP(n.yoy)}（${fmtS(n.diff)}${u}）でした。`);
@@ -1235,20 +1236,20 @@ async function buildDocx(secs){
   const D=await loadDocx();const F=reportFacts();
   const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,HeadingLevel,AlignmentType,ImageRun,BorderStyle,ShadingType,Footer,PageNumber}=D;
   const FONT="游ゴシック";
-  const P=(t,o={})=>new Paragraph({spacing:{after:80},...o,children:[new TextRun({text:t,font:FONT,size:o.size||21,bold:o.bold,color:o.color})]});
-  const H1=t=>new Paragraph({heading:HeadingLevel.HEADING_1,spacing:{before:240,after:120},children:[new TextRun({text:t,font:FONT,bold:true,size:28,color:"1F3B33"})]});
-  const H2=t=>new Paragraph({heading:HeadingLevel.HEADING_2,spacing:{before:200,after:80},children:[new TextRun({text:t,font:FONT,bold:true,size:24,color:"2E5E4E"})]});
+  const P=(t,o={})=>new Paragraph({spacing:{after:80},keepNext:!!o.keepNext,children:[new TextRun({text:t,font:FONT,size:o.size||21,bold:o.bold,color:o.color})]});
+  const H1=t=>new Paragraph({heading:HeadingLevel.HEADING_1,keepNext:true,spacing:{before:240,after:120},children:[new TextRun({text:t,font:FONT,bold:true,size:28,color:"1F3B33"})]});
+  const H2=t=>new Paragraph({heading:HeadingLevel.HEADING_2,keepNext:true,spacing:{before:200,after:80},children:[new TextRun({text:t,font:FONT,bold:true,size:24,color:"2E5E4E"})]});
   const cell=(t,{head,right,w}={})=>new TableCell({width:w?{size:w,type:WidthType.DXA}:undefined,shading:head?{type:ShadingType.CLEAR,color:"auto",fill:"E3EBE7"}:undefined,
     margins:{top:40,bottom:40,left:80,right:80},children:[new Paragraph({alignment:right?AlignmentType.RIGHT:AlignmentType.LEFT,children:[new TextRun({text:String(t??""),font:FONT,size:18,bold:!!head})]})]});
   const table=(head,body,rightFrom=1)=>new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({tableHeader:true,children:head.map((h,i)=>cell(h,{head:true,right:i>=rightFrom}))}),
     ...body.map(r=>new TableRow({children:r.map((c,i)=>cell(c,{right:i>=rightFrom}))}))]});
-  const u=F.unit?`（${F.unit}）`:"";const kids=[];
+  const u=F.unit?`（${F.unit}）`:"";const kids=[];let secNo=0;const H1n=t=>H1(`${++secNo}. ${t}`);
   kids.push(new Paragraph({spacing:{after:60},children:[new TextRun({text:"住宅着工統計 集計レポート",font:FONT,bold:true,size:36,color:"18221F"})]}));
   kids.push(P(`${SRC.label}　${F.pl}（比較：${F.pp}）`,{size:22,color:"5A6762"}));
   kids.push(P(`作成：${fmtDT(Date.now())}　住宅着工 景況マップ ver.1.15.0`,{size:18,color:"5A6762"}));
   if(SRC.kind==="demo")kids.push(P("注意：このレポートは操作確認用の架空データで作成されています。国交省の公表値ではありません。",{bold:true,color:"9A3412"}));
   if(secs.summary){
-    kids.push(H1("1. 概要"));for(const t of summaryText(F))kids.push(P("・"+t));
+    kids.push(H1n("概要"));for(const t of summaryText(F))kids.push(P("・"+t));
     kids.push(H2("集計条件"));
     kids.push(table(["項目","内容"],[["データ",SRC.label],["集計期間",F.pl],["比較期間",F.pp+"（前年同期）"],...F.conds.map(([k,v])=>[k,v]),["単位",F.unit||"—"],["地図の色分け",F.metric],["表示中の地域",S.area?PREFS[S.area]:"全国"]],9));
     const n=F.rows[0];
@@ -1256,28 +1257,28 @@ async function buildDocx(secs){
     kids.push(F.SH?table(["指標","当期","前年同期","前年差"],[[`${LAST.share.val}の構成比`,fmtPct(n.cur),fmtPct(n.prev),fmtPt(n.diff)],["実数（当期）",fmt(n.raw)+(F.unit||""),"",""],["計（当期）",fmt(n.den)+(F.unit||""),"",""]])
       :table(["指標","当期","前年同期","増減","前年同期比"],[[`全国${u}`,fmt(n.cur),fmt(n.prev),fmtS(n.diff),fmtP(n.yoy)]]));
   }
-  if(secs.map){try{const img=await mapPng();kids.push(H1("2. 都道府県別の地図"));kids.push(P(`色分け：${F.metric}`,{size:18,color:"5A6762"}));
+  if(secs.map){try{const img=await mapPng();kids.push(H1n("都道府県別の地図"));kids.push(P(`色分け：${F.metric}`,{size:18,color:"5A6762",keepNext:true}));
     const w=440,h=Math.round(w*img.h/img.w);kids.push(new Paragraph({alignment:AlignmentType.CENTER,children:[new ImageRun({data:img.data,transformation:{width:w,height:h},type:"png"})]}))}catch(e){kids.push(P("（地図画像を作成できませんでした）"))}}
-  if(secs.pref){kids.push(H1("3. 都道府県別一覧"));
+  if(secs.pref){kids.push(H1n("都道府県別一覧"));
     const rows=F.rows.map(r=>{const [rl]=F.SH?ratingPt(r.yoy):rating(r.yoy);return F.SH?[PREFS[r.p],fmtPct(r.cur),fmtPct(r.prev),fmt(r.raw),fmtPt(r.yoy),rl]:[PREFS[r.p],fmt(r.cur),fmt(r.prev),fmtS(r.diff),fmtP(r.yoy),rl]});
     kids.push(table(F.SH?["都道府県","構成比","前年同期","実数"+u,"前年差","判定"]:["都道府県","当期"+u,"前年同期"+u,"増減","前年同期比","判定"],rows));
     kids.push(P(F.SH?"判定：構成比の前年差 +3pt以上「上昇」、0〜+3pt「微増」、−3〜0pt「微減」、−3pt未満「低下」。":"判定：前年同期比 +10%以上「拡大」、0〜+10%「増加」、−10〜0%「減少」、−10%未満「縮小」。",{size:17,color:"5A6762"}))}
-  if(secs.region&&!F.SH){kids.push(H1("4. 地方別"));kids.push(table(["地方","当期"+u,"前年同期"+u,"前年同期比"],REGIONS.map(([nm,ids])=>{const a=aggRegion(F.sel,ids);return [nm,fmt(a.cur),fmt(a.prev),fmtP(a.yoy)]})))}
-  if(secs.bd){const d=SRC.dims.find(x=>x.name===S.bd);if(d){kids.push(H1(`5. ${d.name}別の内訳（${PREFS[S.area]}）`));
+  if(secs.region&&!F.SH){kids.push(H1n("地方別"));kids.push(table(["地方","当期"+u,"前年同期"+u,"前年同期比"],REGIONS.map(([nm,ids])=>{const a=aggRegion(F.sel,ids);return [nm,fmt(a.cur),fmt(a.prev),fmtP(a.yoy)]})))}
+  if(secs.bd){const d=SRC.dims.find(x=>x.name===S.bd);if(d){kids.push(H1n(`${d.name}別の内訳（${PREFS[S.area]}）`));
     const items=d.values.map(v=>{const k=selKey({...S.sel,[d.name]:v});return [v,agg(k,S.area,S.mode,S.Y,S.M),SRC.unit(k)]});const base=items[0][1].cur;
     kids.push(table([d.name,"当期","前年同期","前年同期比","構成比"],items.map(([v,a,un])=>[v,fmt(a.cur)+(un||""),fmt(a.prev)+(un||""),fmtP(a.yoy),base>0&&a.cur!==null&&d.values[0]==="計"?(a.cur/base*100).toFixed(1)+"%":"—"])))}}
-  if(secs.cross&&!$("secCross").hidden){const t=$("crossTbl");kids.push(H1(`6. クロス集計（${PREFS[S.area]}）`));
+  if(secs.cross&&!$("secCross").hidden){const t=$("crossTbl");kids.push(H1n(`クロス集計（${PREFS[S.area]}）`));
     const head=[...t.tHead.rows[0].cells].map(c=>c.title||c.textContent);const body=[...t.tBodies[0].rows].map(r=>[...r.cells].map(c=>c.childNodes.length>1?c.childNodes[0].textContent+"（"+c.childNodes[1].textContent+"）":c.textContent));
     kids.push(table(head,body));kids.push(P($("crossNote").textContent,{size:17,color:"5A6762"}))}
-  if(secs.city&&CITY_LAST&&CITY_LAST.pref===S.area){const C=CITY_LAST;kids.push(H1(`7. 市区町村別（${PREFS[C.pref]}）`));
+  if(secs.city&&CITY_LAST&&CITY_LAST.pref===S.area){const C=CITY_LAST;kids.push(H1n(`市区町村別（${PREFS[C.pref]}）`));
     const list=C.rows.filter(r=>!r.ward&&!r.group).sort((a,b)=>(b.cur??-1e18)-(a.cur??-1e18));
     kids.push(table(C.sh?["市区町村","構成比","前年同期","実数","前年差"]:["市区町村","当期","前年同期","増減","前年同期比"],list.map(r=>C.sh?[r.name,fmtPct(r.cur),fmtPct(r.prev),fmt(r.raw),fmtPt(r.yoy)]:[r.name,fmt(r.cur),fmt(r.prev),fmtS(r.diff),fmtP(r.yoy)])));
     kids.push(P(`${C.period}${C.unit?"、単位："+C.unit:""}。政令市の区と郡の合計行は除いています。`,{size:17,color:"5A6762"}))}
-  if(secs.trend&&SRC.months.length){kids.push(H1(`8. 月別の推移（${PREFS[S.area]}）`));
+  if(secs.trend&&SRC.months.length){kids.push(H1n(`月別の推移（${PREFS[S.area]}）`));
     let y=S.mode==="year"?S.Y:S.mode==="fy"?S.Y+1:S.Y,m=S.mode==="year"?12:S.mode==="fy"?3:S.M;const pts=[];
     for(let i=0;i<24;i++){const a=agg(F.sel,S.area,"month",y,m);if(a.cur!==null)pts.unshift([`${y}年${m}月`,fmt(a.cur),fmt(a.prev),fmtP(a.yoy)]);m--;if(!m){m=12;y--}}
     kids.push(table(["年月","実数"+u,"前年同月"+u,"前年同月比"],pts))}
-  if(secs.ai){kids.push(H1("9. AI分析用の説明"));
+  if(secs.ai){kids.push(H1n("AI分析用の説明"));
     for(const t of ["この文書は、国土交通省「建築着工統計調査」の公表値を、アプリ「住宅着工 景況マップ」で集計したものです。数値は推計や予測を含みません。",
       `集計期間は${F.pl}、比較対象は前年同期（${F.pp}）です。累計や期間指定の値は月次値の合計です。`,
       "前年同期比 =（当期 ÷ 前年同期 − 1）× 100。構成比 = 選んだ区分 ÷ その区分の計 × 100。構成比の前年差はポイント（pt）で表します。",
@@ -1287,7 +1288,9 @@ async function buildDocx(secs){
       "分析を依頼するときの例：「この資料から、前年同期比が大きく動いた地域とその要因として考えられることを整理してください。数値は資料の値だけを使ってください。」"])kids.push(P("・"+t,{size:19}))}
   kids.push(H2("出典"));kids.push(P("国土交通省「建築着工統計調査」（e-Stat）を加工して作成。",{size:18}));
   const doc=new Document({creator:"住宅着工 景況マップ",title:`住宅着工統計 集計レポート ${F.pl}`,description:SRC.label,
-    styles:{default:{document:{run:{font:FONT}}}},
+    styles:{default:{document:{run:{font:FONT}}},paragraphStyles:[
+      {id:"Heading1",name:"Heading 1",basedOn:"Normal",next:"Normal",quickFormat:true,run:{font:FONT,size:28,bold:true,color:"1F3B33"},paragraph:{spacing:{before:240,after:120},outlineLevel:0}},
+      {id:"Heading2",name:"Heading 2",basedOn:"Normal",next:"Normal",quickFormat:true,run:{font:FONT,size:24,bold:true,color:"2E5E4E"},paragraph:{spacing:{before:200,after:80},outlineLevel:1}}]},
     sections:[{properties:{page:{margin:{top:1000,bottom:1000,left:1000,right:1000}}},
       footers:{default:new Footer({children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({children:[PageNumber.CURRENT],font:FONT,size:16,color:"888888"})]})]})},children:kids}]});
   return {blob:await Packer.toBlob(doc),name:`着工統計レポート_${(SRC.key||"data").replace(/[\\/:*?"<>|\s]/g,"")}_${F.pl.replace(/[\\/:*?"<>|\s]/g,"")}${S.area?"_"+PREFS[S.area]:""}.docx`};
