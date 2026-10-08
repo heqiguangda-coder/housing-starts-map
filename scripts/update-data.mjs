@@ -150,7 +150,7 @@ for (const set of SETS) {
       const cityIdx = (index.tables[k].city = index.tables[k].city || {});
       const wantC = needCity(t) && !(cityIdx[ym] && cityIdx[ym].id === id);
       if (!wantP && !wantC) continue;
-      if (!id) { console.log(`  ${ym} 表${no}: ファイルが見つかりません`); continue; }
+      if (!id) { if (t.pref || !cityIdx[ym]) console.log(`  ${ym} 表${no}: ファイルが見つかりません`); continue; } // 6-2と6-2-1のような別名は黙ってとばす
       await sleep(800);
       try {
         const buf = await get(`${BASE}/stat-search/file-download?statInfId=${id}&fileKind=0`, true);
