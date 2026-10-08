@@ -531,18 +531,25 @@ function decodeText(buf){
 /* 表（2次元配列）→ レコード */
 function findYM(text){const m=z2h(text).match(/((令和|平成)\s*(元|\d+)|\d{4})\s*年\s*\d{1,2}\s*月/);return m?parseTime(m[0]):null}
 const LEVEL_NAMES=[[/持家|貸家|給与|分譲/,"利用関係"],[/新設|増改築|その他の住宅/,"工事別"],[/戸数|床面積|件数|工事費|建築物の数/,"表章項目"],[/木造|鉄骨|鉄筋|ブロック/,"構造"],[/一戸建|長屋|共同住宅/,"建て方"],[/民間|公営|機構|都市再生|資金/,"資金別"]];
-function matrixToRecords(rows,fbT){
+// 市区町村：「01100札幌市」のように5桁コードで始まる地域（都道府県の行 xx000 は除く）
+function matchCity(name){if(typeof name!=="string")return null;const m=z2h(name).trim().match(/^(\d{5})\s*([^\d\s].*)$/);if(!m)return null;const c=+m[1];return c%1000===0||c>47999?null:c}
+function cityName(name){return z2h(String(name??"")).trim().replace(/^\d{5}\s*/,"")}
+function cityRecords(rows,fbT){rows=rows.filter(r=>r&&r.some(c=>String(c??"").trim()!==""));if(rows.length<2)return [];return matrixToRecords(rows,fbT,{city:true})||[]}
+function matrixToRecords(rows,fbT,opt){
+  const CITY=!!(opt&&opt.city);
+  const matchArea=CITY?matchCity:matchPref;
+  const anyArea=v=>matchPref(v)!==null||matchCity(v)!==null;
   const ncol=Math.max(...rows.map(r=>r.length));
   let areaCol=-1,best=0;
-  for(let j=0;j<Math.min(ncol,6);j++){const n=rows.filter(r=>matchPref(r[j])!==null&&matchPref(r[j])>0).length;if(n>best){best=n;areaCol=j}}
-  if(best<20)return null;
-  const first=rows.findIndex(r=>matchPref(r[areaCol])!==null);
+  for(let j=0;j<Math.min(ncol,6);j++){const n=rows.filter(r=>{const a=matchArea(r[j]);return a!==null&&a>0}).length;if(n>best){best=n;areaCol=j}}
+  if(best<(CITY?5:20))return null;
+  const first=CITY?rows.findIndex(r=>anyArea(r[areaCol])):rows.findIndex(r=>matchPref(r[areaCol])!==null);
   const t=fbT||findYM(rows.slice(0,Math.max(first,1)).map(r=>r.join(" ")).join(" "));
   if(!t)throw new Error("表の年月が分かりません（ファイル名か表の上部に「2026年8月」などの表記が必要です）");
   const cell=(r,j)=>z2h(String(r[j]??"")).replace(/\s+/g,"").trim();
   const numCount=r=>{let n=0;for(let j=areaCol+1;j<ncol;j++)if(isNumericCell(r[j]))n++;return n};
   let dataStart=ncol;for(const r of rows.slice(first,first+40))for(let j=areaCol+1;j<ncol;j++)if(isNumericCell(r[j])){dataStart=Math.min(dataStart,j);break}
-  const prefHeads=rows.slice(first).filter(r=>matchPref(r[areaCol])!==null).slice(0,48);
+  const prefHeads=rows.slice(first).filter(r=>(CITY?anyArea(r[areaCol]):matchPref(r[areaCol])!==null)).slice(0,48);
   const blockMode=prefHeads.length>=20&&prefHeads.filter(r=>numCount(r)===0).length>=prefHeads.length*.8;
   // 見出し行：データ直前の、地域列より右に2つ以上の値がある行
   const hdr=rows.slice(Math.max(0,first-8),first).filter(r=>{let n=0;for(let j=dataStart;j<ncol;j++)if(cell(r,j))n++;return n>=2});
@@ -561,17 +568,17 @@ function matrixToRecords(rows,fbT){
     if(lab&&!/都道府県|地域|市区町村/.test(lab))return lab;
     const txt=ff[i].join("|");for(const [re,n] of LEVEL_NAMES)if(re.test(txt))return n;return "区分"+(i+1)});
   // 同じ地域が再び現れたら（市部計・郡部計などの別表）そこで打ち切る
-  const seen=new Set();const dataRows=[];
+  const seen=new Set();const dataRows=[];const names=new Map();
   if(blockMode){ // 地域の見出し行の下に、区分（利用関係など）の行が続く形
     let cur=null;
     for(const r of rows.slice(first)){
-      if(numCount(r)===0){const lab=cell(r,areaCol);if(!lab)continue;const p=matchPref(lab);cur=p!==null&&!seen.has(p)?p:null;if(cur!==null)seen.add(cur);continue}
+      if(numCount(r)===0){const lab=cell(r,areaCol);if(!lab)continue;const p=matchArea(lab);cur=p!==null&&!seen.has(p)?p:null;if(cur!==null){seen.add(cur);if(CITY)names.set(cur,cityName(r[areaCol]))}continue}
       if(cur===null)continue;
       let rv="";for(let j=areaCol;j<dataStart;j++)rv+=cell(r,j);
       rv=rv.replace(/[Ａ-Ｚ]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/^([A-Z])(?=[^A-Za-z0-9])/,"$1 ").replace(/^(小計|合計|総計|総数|全建築物計)$/,"計");if(!rv)continue;
       dataRows.push(Object.assign(r.slice(),{_p:cur,_rv:rv}))}
   }else
-  for(const r of rows.slice(first)){const p=matchPref(r[areaCol]);if(p===null)continue;if(seen.has(p))break;seen.add(p);dataRows.push(r)}
+  for(const r of rows.slice(first)){const p=matchArea(r[areaCol]);if(p===null)continue;if(seen.has(p))break;seen.add(p);if(CITY)names.set(p,cityName(r[areaCol]));dataRows.push(r)}
   const cols=[];
   for(let j=0;j<ncol;j++){if(j===areaCol)continue;
     const nums=dataRows.filter(r=>isNumericCell(r[j])).length;if(nums<dataRows.length*.6)continue;
@@ -580,11 +587,15 @@ function matrixToRecords(rows,fbT){
     cols.push({j,labels})}
   if(!cols.length)return null;
   const used=lvName.map((n,i)=>new Set(cols.map(c=>c.labels[i])).size>1);
+  // 市区町村の表で表章項目が1種類（床面積のみなど）のときも、都道府県の表とそろえるため区分として残す
+  const keep=lvName.map((n,i)=>used[i]||(CITY&&/戸数|床面積|建築物の数|件数/.test(cols[0].labels[i])));
   const recs=[];
-  for(const r of dataRows){const pref=blockMode?r._p:matchPref(r[areaCol]);
+  for(const r of dataRows){const pref=blockMode?r._p:matchArea(r[areaCol]);
     for(const c of cols){const v=parseNum(r[c.j]);if(v===undefined||v===null||v===0)continue;
-      const dims={};let unit="";if(blockMode)dims[rowDim]=r._rv;lvName.forEach((n,i)=>{if(!used[i])return;let l=c.labels[i];const m=l.match(/^(.*?)[（(]([^）)]+)[）)]$/);if(m){l=m[1];unit=m[2]}dims[n]=l});
-      recs.push({dims,pref,t,v,unit,sparse:1})}}
+      const dims={};let unit="";if(blockMode)dims[rowDim]=r._rv;lvName.forEach((n,i)=>{if(!keep[i])return;let l=c.labels[i];const m=l.match(/^(.*?)[（(]([^）)]+)[）)]$/);if(m){l=m[1];unit=m[2]}dims[n]=l});
+      if(CITY)recs.push({dims,pref:Math.floor(pref/1000),city:pref,cname:names.get(pref)||"",t,v,unit,sparse:1});
+      else recs.push({dims,pref,t,v,unit,sparse:1})}}
+  if(CITY)return recs;
   if(!recs.length&&dataRows.length)recs.push({dims:{},pref:0,t,v:0,sparse:1,_empty:1});
   return recs;
 }
