@@ -1,0 +1,18 @@
+name: fetch-sample
+on:
+  push:
+    paths: [".github/workflows/fetch-sample.yml"]
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p sample
+          for p in "b621:000040511826" "b721:000040511828"; do n=${p%%:*}; id=${p##*:}; curl -sSL -A "Mozilla/5.0" -o sample/${n}_2026_08.bin "https://www.e-stat.go.jp/stat-search/file-download?statInfId=${id}&fileKind=0"; done
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sample && git commit -m "sample: 建築物 表6-2-1/7-2-1" && git push
