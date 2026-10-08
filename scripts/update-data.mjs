@@ -7,7 +7,8 @@ import * as XLSX from "xlsx";
 
 const ROOT = process.cwd();
 const DATA = path.join(ROOT, "data");
-const FROM = process.env.FROM || "2023-01";
+const FROM = process.env.FROM || "2015-01"; // 都道府県別はこの月から（過去分は少しずつ取り込む）
+const DEADLINE = Date.now() + (+(process.env.MAX_MIN || 70)) * 60000; // 1回の実行時間の上限
 const RECHECK = +(process.env.RECHECK || 3); // 直近何か月分は修正の有無を確認し直すか
 const CITY_FROM = process.env.CITY_FROM || "2024-01"; // 市区町村別はこの月から
 // 表番号 → { k: 保存先の表, pref: 都道府県別を取り出す, city: 市区町村別を取り出す }
@@ -126,7 +127,8 @@ for (const set of SETS) {
   const yms = [...months.keys()].sort();
   const recent = new Set(yms.slice(-RECHECK));
   console.log(`${set.name}: ${yms.length}か月（${yms[0]}〜${yms[yms.length - 1]}）`);
-  for (const ym of yms) {
+  for (const ym of yms.slice().reverse()) { // 新しい月から順に
+    if (Date.now() > DEADLINE) { console.log("  時間の上限に達したため、残りは次回の実行で取り込みます"); break; }
     const isRecent = recent.has(ym);
     const needPref = (t) => t.pref && (!index.tables[t.k].months[ym] || isRecent);
     const needCity = (t) => t.city && ym >= CITY_FROM && (!(index.tables[t.k].city || {})[ym] || isRecent);

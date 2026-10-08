@@ -137,6 +137,9 @@ details.data[open]>summary::after{content:"－"}
 .rrow .btn{flex:none}
 .repo{border:1.5px solid var(--accent);border-radius:8px;padding:12px}
 .newbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--sunk);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;font-size:13px}
+.joinopt{display:grid;gap:4px;margin:0 16px 12px;padding:10px 12px;border:1px solid var(--line);border-radius:6px;background:var(--sunk);font-size:13.5px}
+.joinopt label{display:flex;gap:6px;align-items:center;font-weight:700}
+.joinopt input{width:auto;min-height:0}
 .drop{border:1.5px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);font-size:13px;display:grid;gap:8px;justify-items:center}
 .drop.over{border-color:var(--accent);background:var(--sunk)}
 .status{font-size:12.5px;min-height:1.4em}
@@ -382,6 +385,10 @@ section[id],details[id]{scroll-margin-top:12px}
 
   <details class="data" id="dataPanel">
     <summary><span>データの読み込み</span><span class="note" id="dataSummary"></span></summary>
+    <div class="joinopt">
+      <label><input type="checkbox" id="appendChk" checked> 同じ表の保存データとつなげる</label>
+      <p class="note" style="margin:0">自動更新データ・Excel・APIのどれで読み込んでも、同じ表（表15など）は1本のデータにつなげます。区分名の違い（「工事」と「工事別」など）はそろえ、同じ月が重なる場合は国交省の月次Excel（自動更新データを含む）の値を使います。APIの値は、Excelにない古い月を補います。</p>
+    </div>
     <div class="datagrid">
       <section class="repo">
         <h3>自動更新データ（おすすめ）</h3>
@@ -404,7 +411,6 @@ section[id],details[id]{scroll-margin-top:12px}
           <label class="btn" for="fileIn">ファイルを選ぶ</label>
           <input id="fileIn" class="sr" type="file" accept=".csv,.txt,.xlsx,.xls,text/csv,text/plain,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" multiple>
         </div>
-        <label class="row" style="gap:8px;font-size:13px;align-items:center"><input type="checkbox" id="appendChk" style="width:auto;min-height:0"> 今のデータに追加する（APIで取得した2024年までに、2025年以降のExcelを足す場合など）</label>
         <p><b>2025年以降の月次</b>はExcelでのみ公開されています。e-Statの「住宅着工統計 月次」から各月の「表15 都道府県別、工事別、利用関係別」などのExcelを保存し、まとめて選んでください。年月はファイル名か表の見出しから読み取ります。</p>
         <p>列指向（1行1数値）と、年月を列に並べた横持ちの表にも対応します。地域名・年月（「2025年8月」「2025年」「2025年度」「令和7年8月」など）・区分列を自動判別します。</p>
       </section>
@@ -708,10 +714,11 @@ function rowsToRecords(rows,fbT){
     let best=-1,bf=0;for(const j of cs){if(/code|コード/i.test(head[j]))continue;const f=frac(j,c=>matchPref(c)!==null);if(f>bf){bf=f;best=j}}
     return bf>.5?best:-1}
 }
+const DIM_ALIAS={"工事別":"工事","用途":"用途(大分類)","用途(大分類別)":"用途(大分類)","建築主別":"建築主","構造別":"構造","建て方別":"建て方","利用関係別":"利用関係","地上階数":"地上の階数","階数":"地上の階数"};
 function buildSource(recs,label,kind,zfOpt){
   recs=recs.filter(r=>!r._empty||recs.length===1);
   if(!recs.length)throw new Error("集計できる行がありません（地域・年月・数値を確認してください）");
-  for(const r of recs){const nd={};for(const k in r.dims){const v=normText(r.dims[k]).trim();const kk=normText(k).replace(/\s+/g,"");nd[kk]=/^(総数|合計|総計|計|小計|全建築物計)$/.test(v.replace(/\s+/g,""))?"計":v}r.dims=nd}
+  for(const r of recs){const nd={};for(const k in r.dims){const v=normText(r.dims[k]).trim();let kk=normText(k).replace(/\s+/g,"");kk=DIM_ALIAS[kk]||kk;nd[kk]=/^(総数|合計|総計|計|小計|全建築物計)$/.test(v.replace(/\s+/g,""))?"計":v}r.dims=nd}
   const dimNames=[];const dimVals={};
   for(const r of recs)for(const k in r.dims){if(!dimVals[k]){dimVals[k]=[];dimVals[k].set=new Set();dimNames.push(k)}if(!dimVals[k].set.has(r.dims[k])){dimVals[k].set.add(r.dims[k]);dimVals[k].push(r.dims[k])}}
   const dims=dimNames.map(n=>({name:n,values:dimVals[n].slice()}));
@@ -881,7 +888,7 @@ function setSource(src,keepView,fromSave){
   const b=$("srcBadge");b.className="badge "+(demo?"demo":"live");b.textContent=demo?"架空データ":"読み込みデータ";
   const range=SRC.months.length?`${SRC.months[0].replace("-","年")}月〜${SRC.months[SRC.months.length-1].replace("-","年")}月`:(SRC.annual.concat(SRC.fys)).join("・");
   $("dataSummary").textContent=`${SRC.label}　${range}`;
-  $("srcDetail").innerHTML=`<b>${esc(SRC.label)}</b><br>期間：${esc(range)}<br>区分：${SRC.dims.map(d=>esc(d.name)+"（"+d.values.length+"）").join("、")||"なし"}<br>データ件数：${nf.format(SRC.count)}`;
+  $("srcDetail").innerHTML=`<b>${esc(SRC.label)}</b><br>期間：${esc(range)}<br>区分：${SRC.dims.map(d=>esc(d.name)+"（"+d.values.length+"）").join("、")||"なし"}<br>データ件数：${nf.format(SRC.count)}${basisText(SRC)?`<br>出典の内訳：${esc(basisText(SRC))}`:""}`;
   render();
 }
 const GLOSSARY=[
@@ -1646,7 +1653,7 @@ function packSource(src){
   src.recs.forEach((r,i)=>{names.forEach((nm,j)=>idx[o++]=(vi[j].get(r.dims[nm]??"")??-1)+1);
     if(!ti.has(r.t)){ti.set(r.t,times.length);times.push(r.t)}idx[o++]=ti.get(r.t);
     const u=r.unit||"";if(!ui.has(u)){ui.set(u,units.length);units.push(u)}idx[o++]=ui.get(u);idx[o++]=r.pref;val[i]=r.v});
-  return {v:2,label:src.label,kind:src.kind,zf:src.zeroFill,names,vals,times,units,k,idx,val,savedAt:Date.now()};
+  return {v:2,label:src.label,kind:src.kind,zf:src.zeroFill,msrc:src.monthSrc||null,names,vals,times,units,k,idx,val,savedAt:Date.now()};
 }
 function unpackSource(p){
   const recs=[];const n=p.names.length;
@@ -1654,7 +1661,7 @@ function unpackSource(p){
       recs.push({dims,t:p.times[p.idx[o+n]],unit:p.units[p.idx[o+n+1]],pref:p.idx[o+n+2],v:p.val[i]})}}
   else for(let o=0;o<p.arr.length;o+=p.w){const dims={};for(let i=0;i<n;i++){const k=p.arr[o+i];if(k>=0)dims[p.names[i]]=p.vals[i][k]}
     recs.push({dims,pref:p.arr[o+n],t:p.times[p.arr[o+n+1]],unit:p.units[p.arr[o+n+2]],v:p.arr[o+n+3]})}
-  const src=buildSource(recs,p.label,p.kind,p.zf);src.savedAt=p.savedAt;return src;
+  const src=buildSource(recs,p.label,p.kind,p.zf);src.savedAt=p.savedAt;src.monthSrc=p.msrc||null;return src;
 }
 const fmtDT=t=>{const d=new Date(t);return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`};
 function showSaved(msg){$("saveInfo").textContent=msg}
@@ -1663,14 +1670,47 @@ const ID_TABLE={"0003114535":"表15","0003114565":"表16","0003119736":"表18","
 function tableNoOf(rows){const m=z2h(rows.map(r=>r.join(" ")).join(" ")).match(/第\s*(\d+)\s*表(?:\s*[-－ー―‐]\s*(\d+))?/);return m?String(+m[1])+(m[2]?"-"+(+m[2]):""):null}
 let META={active:null,list:[]};
 async function saveMeta(){try{await IDB.put("meta",META)}catch(e){}renderDsList()}
+// 出典の種類：Excel系（自動更新データ・Excelファイル）を優先し、APIは足りない月だけ使う
+const RANK={repo:2,file:2,api:1};
+function basisOf(kind){return kind==="api"?"api":"excel"}
 async function loadDataset(recs,key,label,kind){
-  let base=null;
+  let base=null,baseSrc=null;
   if($("appendChk").checked){
-    if(META.list.some(x=>x.key===key)){try{const p=await IDB.get("ds:"+key);if(p&&(p.arr||p.idx))base=unpackSource(p).recs}catch(e){}}
-    else if(SRC&&SRC.kind!=="demo"&&SRC.recs){base=SRC.recs;key=SRC.key||key}
+    if(META.list.some(x=>x.key===key)){try{const p=await IDB.get("ds:"+key);if(p&&(p.arr||p.idx)){const b=unpackSource(p);base=b.recs;baseSrc=b.monthSrc||{}}}catch(e){}}
   }
-  const src=buildSource(base?base.concat(recs):recs,TABLE_NAMES[key]||label,kind);src.key=key;
+  const newBasis=basisOf(kind);
+  // 新しいデータの区分を、保存済みデータの区分名・値に合わせる
+  let merged=recs,msrc={};
+  for(const r of recs)msrc[r.t]=newBasis;
+  if(base&&base.length){
+    const ref=buildSource(base.slice(0,20000),"ref","file");
+    recs=harmonize(recs,ref.dims);
+    const newMonths=new Set(recs.map(r=>r.t));const baseMonths=new Set(base.map(r=>r.t));
+    const keepBase=new Set(),takeNew=new Set();
+    for(const t of new Set([...newMonths,...baseMonths])){
+      const bb=baseSrc[t]||"excel";const has=newMonths.has(t),had=baseMonths.has(t);
+      if(has&&had){if((RANK[kind]||2)>=(bb==="api"?1:2)){takeNew.add(t);msrc[t]=newBasis}else{keepBase.add(t);msrc[t]=bb}}
+      else if(has){takeNew.add(t);msrc[t]=newBasis}else{keepBase.add(t);msrc[t]=bb}}
+    merged=base.filter(r=>keepBase.has(r.t)).concat(recs.filter(r=>takeNew.has(r.t)));
+  }
+  const src=buildSource(merged,TABLE_NAMES[key]||label,kind);src.key=key;src.monthSrc=msrc;
   setSource(src,false);return src;
+}
+// 区分名・値をそろえる（足りない区分は「計」、表章項目は単位から推定）
+function harmonize(recs,dims){
+  const names=dims.map(d=>d.name);const vals=new Map(dims.map(d=>[d.name,new Set(d.values)]));
+  return recs.map(r=>{const nd={};const src={};for(const k in r.dims){let kk=normText(k).replace(/\s+/g,"");kk=DIM_ALIAS[kk]||kk;src[kk]=normText(r.dims[k]).trim()}
+    for(const n of names){let v=src[n];
+      if(v===undefined){if(/表章/.test(n)){const vs=[...vals.get(n)];v=/戸/.test(r.unit||"")?vs.find(x=>/戸数/.test(x)):/㎡|m2/.test(r.unit||"")?vs.find(x=>/床面積/.test(x)):/棟/.test(r.unit||"")?vs.find(x=>/建築物の数/.test(x)):undefined;if(!v)return null}else v="計"}
+      nd[n]=v}
+    return {...r,dims:nd}}).filter(Boolean);
+}
+function basisText(src){
+  const m=src&&src.monthSrc;if(!m||!Object.keys(m).length)return "";
+  const ts=Object.keys(m).filter(t=>t.length===7).sort();const seg=[];
+  for(const t of ts){const b=m[t];const last=seg[seg.length-1];if(last&&last.b===b)last.to=t;else seg.push({b,from:t,to:t})}
+  const f=t=>t.replace("-","年")+"月";
+  return seg.map(x=>`${f(x.from)}〜${f(x.to)}：${x.b==="api"?"e-Stat API（データベース）":"国交省の月次Excel"}`).join("／");
 }
 async function persist(src){
   const key=src.key||src.label;src.key=key;
@@ -1705,6 +1745,7 @@ function renderDsList(){
 let RIDX=null;
 const REPO_KEY={h15:"表15",h16:"表16",h18:"表18","b4-1":"表4-1",b5:"表5","b6-1":"表6-1","b7-1":"表7-1"};
 async function loadRepoIndex(){
+  if(location.protocol==="file:"){RIDX=null}
   try{const r=await fetch("data/index.json",{cache:"no-cache"});if(!r.ok)throw 0;RIDX=await r.json()}catch(e){RIDX=null}
   const list=$("rList");
   if(!RIDX||!RIDX.tables){list.innerHTML=`<p class="note" style="margin:0">このページでは使えません。GitHub Pages版（heqiguangda-coder.github.io/housing-starts-map/）で開くと使えます。</p>`;$("rFrom").disabled=true;return}
@@ -1716,33 +1757,53 @@ async function loadRepoIndex(){
     (RIDX.updated?`<p class="note" style="margin:0">最終更新：${fmtDT(Date.parse(RIDX.updated))}　出典：国土交通省「建築着工統計調査」（e-Stat）</p>`:"");
   checkNewMonth();
 }
-async function loadRepoTable(k,fromY,silent){
-  const t=RIDX.tables[k];const st=$("rStatus");st.className="status";
-  const ms=Object.keys(t.months).filter(m=>+m.slice(0,4)>=fromY-1).sort();
-  if(!ms.length){st.className="status err";st.textContent="指定の期間にデータがありません。";return}
-  const recs=[];let done=0;
+// 自動更新データ：月別ファイルを読み込み、保存データにつなげる（only：この月だけ）
+async function fetchRepoMonths(k,ms,onProg){
+  const t=RIDX.tables[k];const recs=[];let done=0;
   const one=async m=>{const r=await fetch(t.months[m].file+"?id="+t.months[m].id);if(!r.ok)throw new Error(m+" の取得に失敗しました");const p=await r.json();
     const n=p.names.length;for(let o=0;o<p.rows.length;o+=p.w){const dims={};for(let j=0;j<n;j++){const x=p.rows[o+j];if(x>=0)dims[p.names[j]]=p.vals[j][x]}
       recs.push({dims,pref:p.rows[o+n],t:p.t,unit:p.units[p.rows[o+n+1]],v:p.rows[o+n+2],sparse:1})}
-    done++;st.textContent=`読み込み中… ${done}/${ms.length}か月`};
+    done++;onProg&&onProg(done,ms.length)};
+  for(let i=0;i<ms.length;i+=6)await Promise.all(ms.slice(i,i+6).map(one));
+  return recs;
+}
+function repoSel(){try{return JSON.parse(localStorage.getItem("hs.repoSel")||"{}")}catch(e){return {}}}
+function setRepoSel(key,v){try{const all=repoSel();all[key]=v;localStorage.setItem("hs.repoSel",JSON.stringify(all))}catch(e){}}
+async function loadRepoTable(k,fromY){
+  const t=RIDX.tables[k];const st=$("rStatus");st.className="status";
+  const ms=Object.keys(t.months).filter(m=>+m.slice(0,4)>=fromY-1).sort();
+  if(!ms.length){st.className="status err";st.textContent="指定の期間にデータがありません。";return}
   try{
-    for(let i=0;i<ms.length;i+=6)await Promise.all(ms.slice(i,i+6).map(one));
+    const recs=await fetchRepoMonths(k,ms,(d,n)=>st.textContent=`読み込み中… ${d}/${n}か月`);
     const key=REPO_KEY[k]||t.key;
-    $("appendChk").checked=false;
-    const src=await loadDataset(recs,key,t.label,"repo");src.repo={k,fromY,last:ms[ms.length-1]};
-    try{const all=JSON.parse(localStorage.getItem("hs.repoSel")||"{}");all[key]={k,fromY};localStorage.setItem("hs.repoSel",JSON.stringify(all))}catch(e){}
-    st.textContent=`「${t.label}」を読み込みました（${ms[0].replace("-","年")}月〜${ms[ms.length-1].replace("-","年")}月、${nf.format(recs.length)}件）。`;
+    await loadDataset(recs,key,t.label,"repo");
+    setRepoSel(key,{k,fromY,ids:Object.fromEntries(ms.map(m=>[m,t.months[m].id]))});
+    st.textContent=`「${t.label}」を読み込みました（${ms[0].replace("-","年")}月〜${ms[ms.length-1].replace("-","年")}月、${nf.format(recs.length)}件）。以後、新しい月や修正は開いたときに自動で取り込みます。`;
     $("newBar").hidden=true;
   }catch(e){st.className="status err";st.textContent=e.message}
 }
-function checkNewMonth(){
-  if(!RIDX||!SRC||SRC.kind==="demo")return;
-  let sel={};try{sel=JSON.parse(localStorage.getItem("hs.repoSel")||"{}")}catch(e){}
-  const info=sel[SRC.key];if(!info||!RIDX.tables[info.k])return;
-  const ms=Object.keys(RIDX.tables[info.k].months).sort();const last=ms[ms.length-1];const have=SRC.months[SRC.months.length-1];
-  if(last&&have&&last>have){$("newTxt").textContent=`「${RIDX.tables[info.k].label}」に新しい月（${last.replace("-","年")}月）が公表されています。`;$("newBar").hidden=false;$("newBtn").onclick=()=>loadRepoTable(info.k,info.fromY)}
-  else $("newBar").hidden=true;
+// 開いたとき・表を切り替えたときに、自動更新データの新しい月と修正を取り込む（取得し直しは不要）
+let AUTO_BUSY=false;
+async function autoRefresh(){
+  if(AUTO_BUSY||!RIDX||!SRC||SRC.kind==="demo")return;
+  const info=repoSel()[SRC.key];if(!info||!RIDX.tables[info.k])return;
+  const t=RIDX.tables[info.k];const ids=info.ids||{};const have=new Set(SRC.months);
+  const ms=Object.keys(t.months).filter(m=>+m.slice(0,4)>=info.fromY-1).sort().filter(m=>ids[m]?ids[m]!==t.months[m].id:!have.has(m)||!info.ids);
+  if(!ms.length){$("newBar").hidden=true;return}
+  AUTO_BUSY=true;const key=SRC.key;
+  try{
+    $("newTxt").textContent=`自動更新データから${ms.length}か月分を取り込んでいます…`;$("newBtn").hidden=true;$("newBar").hidden=false;
+    const recs=await fetchRepoMonths(info.k,ms);
+    const keepChk=$("appendChk").checked;$("appendChk").checked=true;
+    try{await loadDataset(recs,key,t.label,"repo")}finally{$("appendChk").checked=keepChk}
+    const nids={...ids};for(const m of ms)nids[m]=t.months[m].id;setRepoSel(key,{...info,ids:nids});
+    const newest=ms.filter(m=>!have.has(m));
+    $("newTxt").textContent=newest.length?`最新の公表分（${newest.map(m=>m.replace("-","年")+"月").join("・")}）を自動で取り込みました。`:`国交省の修正（${ms.length}か月分）を自動で取り込みました。`;
+    setTimeout(()=>$("newBar").hidden=true,8000);
+  }catch(e){$("newTxt").textContent="自動更新データの取り込みに失敗しました。通信状態を確認してください。";setTimeout(()=>$("newBar").hidden=true,8000)}
+  finally{AUTO_BUSY=false;$("newBtn").hidden=false}
 }
+function checkNewMonth(){autoRefresh()}
 $("rList").addEventListener("click",e=>{const b=e.target.closest("[data-rk]");if(b)loadRepoTable(b.dataset.rk,+$("rFrom").value||new Date().getFullYear()-1)});
 let rz;let lastW=0;window.addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{const w=$("trend").clientWidth;if(SRC&&w!==lastW){lastW=w;renderTrend(selKey(S.sel),SRC.unit(selKey(S.sel)))}},150)});
 $("tabbar").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const t=$(b.dataset.t);if(t.tagName==="DETAILS")t.open=true;t.scrollIntoView({behavior:"smooth",block:"start"})});
@@ -1759,9 +1820,12 @@ buildMap();
     if(old&&(old.arr||old.idx)){const src=unpackSource(old);const k=tableNoOf([[src.label]])?"表"+tableNoOf([[src.label]]):src.label;
       await IDB.put("ds:"+k,old);META.list=META.list.filter(x=>x.key!==k);META.list.push({key:k,label:src.label,savedAt:old.savedAt,range:""});META.active=k;await IDB.put("meta",META);await IDB.del("source")}
   }catch(e){}
-  if(META.active&&META.list.some(x=>x.key===META.active))await switchDataset(META.active);
+  const hadSaved=META.active&&META.list.some(x=>x.key===META.active);
+  if(hadSaved)await switchDataset(META.active);
   else{setSource(makeDemo(),true);renderDsList()}
-  loadRepoIndex();
+  await loadRepoIndex();
+  // 初めて開いたとき（保存データなし）は、自動更新データの表15を直近2年分読み込む
+  if(!hadSaved&&!META.list.length&&RIDX&&RIDX.tables&&RIDX.tables.h15){const ys=Object.keys(RIDX.tables.h15.months).map(m=>+m.slice(0,4));await loadRepoTable("h15",Math.max(...ys)-1)}
 })();
 </script>
 
