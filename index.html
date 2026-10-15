@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-title" content="住宅着工マップ"><meta name="theme-color" content="#f2f4f3" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#111715" media="(prefers-color-scheme: dark)">
 <style>html{-webkit-text-size-adjust:100%}:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 </head><body>
-<title>住宅着工 景況マップ ver.1.18.0</title>
+<title>住宅着工 景況マップ ver.1.18.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDPMincho:wght@700&display=swap">
@@ -178,7 +178,11 @@ th.cum,td.cum{background:color-mix(in srgb,var(--sunk) 55%,transparent)}
 #tbl th:first-child,#tbl td:first-child,#cityTbl th:first-child,#cityTbl td:first-child{position:sticky;left:0;z-index:2;background:var(--surface);box-shadow:1px 0 0 var(--line)}
 #tbl thead th:first-child,#cityTbl thead th:first-child{z-index:3;background:var(--sunk)}
 #tbl tbody tr:hover td:first-child,#tbl tbody tr.sel td:first-child,#cityTbl tbody tr:hover td:first-child,#cityTbl tbody tr.hi td:first-child{background:var(--sunk)}
-td .rk{display:block;font-size:10.5px;color:var(--muted);font-weight:400;line-height:1.2}
+.rankbar{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;margin:0 0 8px;font-size:12.5px}
+.rankbar .chk{display:flex;gap:5px;align-items:center;margin:0}
+.rankbar .chk input{width:auto;min-height:0}
+small.rk{display:inline-block;margin-left:5px;min-width:2.6em;padding:0 4px;border-radius:3px;background:var(--sunk);color:var(--muted);font-size:10.5px;font-weight:700;text-align:center;vertical-align:1px}
+tr.nat small.rk{display:none}
 .playbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--sunk)}
 .playbar .pbtn{width:36px;height:36px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);cursor:pointer;display:grid;place-items:center;flex:none}
 .playbar .pbtn svg{width:16px;height:16px;fill:currentColor}
@@ -250,7 +254,7 @@ section[id],details[id]{scroll-margin-top:12px}
 <div class="wrap">
   <header class="top">
     <div>
-      <h1>住宅着工 景況マップ <span class="ver">ver.1.18.0</span></h1>
+      <h1>住宅着工 景況マップ <span class="ver">ver.1.18.1</span></h1>
       <p class="sub" id="subtitle">国土交通省「建築着工統計調査（住宅着工統計）」に基づく前年同期比の集計</p>
     </div>
     <div class="row">
@@ -316,7 +320,8 @@ section[id],details[id]{scroll-margin-top:12px}
       <div class="mapinfo" id="mapInfo"></div>
     </section>
     <section class="panel" id="secTable">
-      <h2><span>都道府県別一覧</span><span class="row" style="gap:8px;align-items:center"><span class="note" id="unitNote"></span><select id="cumSel" aria-label="累計の表示" hidden><option value="cy">暦年累計も表示</option><option value="fy">年度累計も表示</option><option value="both">暦年・年度累計を表示</option><option value="none">累計を表示しない</option></select><label class="note" style="display:flex;gap:4px;align-items:center;white-space:nowrap"><input type="checkbox" id="rankChk" style="width:auto;min-height:0"> 順位を表示</label><button class="btn" type="button" id="copyBtn">表をコピー</button></span></h2>
+      <h2><span>都道府県別一覧</span><span class="row" style="gap:8px;align-items:center"><span class="note" id="unitNote"></span><select id="cumSel" aria-label="累計の表示" hidden><option value="cy">暦年累計も表示</option><option value="fy">年度累計も表示</option><option value="both">暦年・年度累計を表示</option><option value="none">累計を表示しない</option></select><button class="btn" type="button" id="copyBtn">表をコピー</button></span></h2>
+      <div class="rankbar" id="rankBar"></div>
       <div class="tablebox"><table id="tbl"><thead></thead><tbody></tbody></table></div>
       <p class="note" style="margin:8px 0 0" id="tblNote">判定：前年同期比 +10%以上「拡大」／0〜+10%「増加」／−10〜0%「減少」／−10%未満「縮小」。見出しを押すと並べ替えます。</p>
     </section>
@@ -509,8 +514,8 @@ section[id],details[id]{scroll-margin-top:12px}
         <div class="dslist" id="dsList"></div>
         <button class="btn" id="demoBtn" type="button">保存データをすべて消して架空データに戻す</button>
         <h3 style="margin-top:8px">バージョン</h3>
-        <p style="margin:0">ver.1.18.0（2026-10-16）</p>
-        <ul class="vhist"><li><b>ver.1.18.0</b> 一覧の都道府県名・市区町村名の列を固定、順位の表示切り替え、地図の期間推移の再生ボタン、木造化率（一覧の列・地図の色分け・Word）</li><li><b>ver.1.17.0</b> APIとExcelのデータを1本につなげて同じ基準で比較（区分名をそろえ、重なる月はExcel値を優先）、自動更新データを2015年まで拡張、保存データへの新しい月・修正の自動取り込み、初回は表15を自動で読み込み</li><li><b>ver.1.16.0</b> 選択した都道府県の市区町村別の色分け地図、単月表示で暦年累計・年度累計を一覧に表示</li><li><b>ver.1.15.0</b> 市区町村別の集計（表15・16・18・6-1・7-1、2024年1月分から）、集計結果のWord出力（地図画像・一覧・AI分析用の説明つき）</li><li><b>ver.1.14.0</b> アプリ名とファイル名にバージョンを表示、変更履歴を追加</li><li><b>ver.1.13.0</b> 集計期間に「期間指定」（開始年月〜終了年月を前年同期間と比較）</li><li><b>ver.1.12.0</b> 月次Excelを毎日自動取得する「自動更新データ」と新しい月の通知</li><li><b>ver.1.11.1</b> 月次Excelの検索で表18・表4-1が見つからない不具合を修正</li><li><b>ver.1.11.0</b> e-Stat APIで建築物の表（表4・5・6-1・7-1）を取得</li><li><b>ver.1.10.0</b> 表4-1（用途×階数×構造）、非住宅（D〜R）、構成比（木造率）、クロス集計</li><li><b>ver.1.9.0</b> 建築物の表5・6-1・7-1の読み込み</li><li><b>ver.1.8.0</b> 表18（構造別・建て方別）の読み込み</li><li><b>ver.1.7.0</b> 表ごとに複数のデータを保存し切り替え</li><li><b>ver.1.6.0</b> 区分の用語説明（？ボタン）</li><li><b>ver.1.5.1</b> 表15・表16のExcel読み取り（市部・郡部の上書き）を修正</li><li><b>ver.1.5.0</b> 読み込んだデータを端末に保存</li><li><b>ver.1.4.1</b> APIのlimitエラーとiPhoneでの表示崩れを修正</li><li><b>ver.1.4.0</b> 月次Excelのダウンロードボタン</li><li><b>ver.1.3.0</b> 国交省の月次Excelの読み込み</li><li><b>ver.1.2.0</b> e-Stat APIで月次表を集めて取得</li><li><b>ver.1.1.0</b> iPhone向けの画面</li><li><b>ver.1.0.0</b> 初版（都道府県別の表と色分け地図、前年同期比）</li></ul>
+        <p style="margin:0">ver.1.18.1（2026-10-16）</p>
+        <ul class="vhist"><li><b>ver.1.18.1</b> 順位の表示を「森林資源 動向マップ」と同じ形に（列ごとのチェックボックス、値の右にラベル）</li><li><b>ver.1.18.0</b> 一覧の都道府県名・市区町村名の列を固定、順位の表示切り替え、地図の期間推移の再生ボタン、木造化率（一覧の列・地図の色分け・Word）</li><li><b>ver.1.17.0</b> APIとExcelのデータを1本につなげて同じ基準で比較（区分名をそろえ、重なる月はExcel値を優先）、自動更新データを2015年まで拡張、保存データへの新しい月・修正の自動取り込み、初回は表15を自動で読み込み</li><li><b>ver.1.16.0</b> 選択した都道府県の市区町村別の色分け地図、単月表示で暦年累計・年度累計を一覧に表示</li><li><b>ver.1.15.0</b> 市区町村別の集計（表15・16・18・6-1・7-1、2024年1月分から）、集計結果のWord出力（地図画像・一覧・AI分析用の説明つき）</li><li><b>ver.1.14.0</b> アプリ名とファイル名にバージョンを表示、変更履歴を追加</li><li><b>ver.1.13.0</b> 集計期間に「期間指定」（開始年月〜終了年月を前年同期間と比較）</li><li><b>ver.1.12.0</b> 月次Excelを毎日自動取得する「自動更新データ」と新しい月の通知</li><li><b>ver.1.11.1</b> 月次Excelの検索で表18・表4-1が見つからない不具合を修正</li><li><b>ver.1.11.0</b> e-Stat APIで建築物の表（表4・5・6-1・7-1）を取得</li><li><b>ver.1.10.0</b> 表4-1（用途×階数×構造）、非住宅（D〜R）、構成比（木造率）、クロス集計</li><li><b>ver.1.9.0</b> 建築物の表5・6-1・7-1の読み込み</li><li><b>ver.1.8.0</b> 表18（構造別・建て方別）の読み込み</li><li><b>ver.1.7.0</b> 表ごとに複数のデータを保存し切り替え</li><li><b>ver.1.6.0</b> 区分の用語説明（？ボタン）</li><li><b>ver.1.5.1</b> 表15・表16のExcel読み取り（市部・郡部の上書き）を修正</li><li><b>ver.1.5.0</b> 読み込んだデータを端末に保存</li><li><b>ver.1.4.1</b> APIのlimitエラーとiPhoneでの表示崩れを修正</li><li><b>ver.1.4.0</b> 月次Excelのダウンロードボタン</li><li><b>ver.1.3.0</b> 国交省の月次Excelの読み込み</li><li><b>ver.1.2.0</b> e-Stat APIで月次表を集めて取得</li><li><b>ver.1.1.0</b> iPhone向けの画面</li><li><b>ver.1.0.0</b> 初版（都道府県別の表と色分け地図、前年同期比）</li></ul>
         <h3 style="margin-top:8px">出典と注意</h3>
         <p>市区町村の地図：「国土数値情報（行政区域データ）」（国土交通省）を加工して作成（加工データ：スマートニュース メディア研究所）。原典：国土交通省「<a href="https://www.mlit.go.jp/sogoseisaku/jouhouka/sosei_jouhouka_tk4_000002.html" target="_blank" rel="noopener">建築着工統計調査</a>」（毎月末頃に前月分を公表）、<a href="https://www.e-stat.go.jp/stat-search/database?toukei=00600120" target="_blank" rel="noopener">e-Stat</a>。統計表の「−」は0、「…」「x」は欠測として扱います。累計・年計は月次値の合計で、期間内に欠測月があると表示しません。1戸あたり工事費など比率の指標は合計できないため単月で見てください。</p>
       </section>
@@ -890,7 +895,7 @@ function setSource(src,keepView,fromSave){
     if(!v)v=d.values.find(x=>/^(総数|計|合計|総計|全体|総)$/.test(x))||d.values.find(x=>/戸数/.test(x))||d.values.find(x=>/床面積/.test(x))||d.values[0];
     S.sel[d.name]=v}
   if(saved&&saved.cum)S.cum=saved.cum;
-  if(saved)S.rank=!!saved.rank;$("rankChk").checked=!!S.rank;
+  if(saved)S.rank=Array.isArray(saved.rank)?saved.rank:saved.rank?["cur","prev","diff","yoy"]:[];
   if(saved){S.metric=saved.metric||S.metric;S.trend=saved.trend||S.trend;S.mode=saved.mode||S.mode;if(saved.span)S.span=saved.span}
   if(S.mode==="range"&&!S.span)S.span=12;
   if(!SRC.months.length&&["month","ytd","ttm","range"].includes(S.mode))S.mode=SRC.fys.length&&!SRC.annual.length?"fy":"year";
@@ -1146,9 +1151,13 @@ function showInfo(p){
 // 47都道府県の中での順位（大きい順、全国は対象外）
 function ranksOf(rows,keys){const R={};for(const k of keys){const vs=rows.filter(r=>r.p>0&&r[k]!==null&&r[k]!==undefined).sort((a,b)=>b[k]-a[k]);R[k]=new Map();
   vs.forEach((r,i)=>{const prev=i&&vs[i-1][k]===r[k]?R[k].get(vs[i-1].p):i+1;R[k].set(r.p,prev)})}return R}
-function rankKeys(SH){return (SH?["cur","prev","raw","yoy"]:["cur","prev","diff","yoy"]).concat(woodOn()?["wood"]:[])}
+function rankCols(SH){return (SH?[["cur","構成比"],["prev","前年同期"],["raw","実数"],["yoy","前年差"]]:[["cur","当期"],["prev","前年同期"],["diff","増減"],["yoy","前年比"]]).concat(woodOn()?[["wood","木造化率"]]:[])}
+function rankKeys(SH){return rankCols(SH).map(c=>c[0]).filter(k=>(S.rank||[]).includes(k))}
+function renderRankBar(SH){const cols=rankCols(SH);
+  $("rankBar").innerHTML=`<span class="lbl">順位を表示</span>`+cols.map(([k,l])=>`<label class="chk"><input type="checkbox" data-rk="${k}"${(S.rank||[]).includes(k)?" checked":""}> ${l}</label>`).join("")}
 function renderTable(rows,unit){
-  const SH=!!LAST.share;const RK=S.rank?ranksOf(rows,rankKeys(SH)):null;const rk=(k,r)=>RK&&r.p>0&&RK[k].has(r.p)?`<small class="rk">${RK[k].get(r.p)}位</small>`:"";
+  const SH=!!LAST.share;renderRankBar(SH);const rks=rankKeys(SH);const RK=rks.length?ranksOf(rows,rks):null;
+  const rk=(k,r)=>RK&&RK[k]&&r.p>0?(RK[k].has(r.p)?`<small class="rk">${RK[k].get(r.p)}位</small>`:`<small class="rk">—</small>`):"";
   const cols=SH?[["p","都道府県"],["cur","構成比"],["prev","前年同期"],["raw","実数"],["yoy","前年差"],["r","判定"]]:[["p","都道府県"],["cur","当期"],["prev","前年同期"],["diff","増減"],["yoy","前年比"],["r","判定"]];
   const ck=cumKinds();for(const k of ck)cols.push([k+"Cur",(k==="cy"?"暦年累計":"年度累計")+(SH?"構成比":"")],[k+"Yoy",(k==="cy"?"暦年":"年度")+(SH?"累計前年差":"累計比")]);
   const WD=woodOn();if(WD)cols.push(["wood","木造化率"],["woodDiff","木造化率前年差"]);
@@ -1158,7 +1167,7 @@ function renderTable(rows,unit){
   const mx=Math.max(SH?5:20,...rows.map(r=>Math.abs(r.yoy??0)));const lim=SH?Math.ceil(mx):Math.min(60,Math.ceil(mx/10)*10);
   const tr=r=>{const [rl,rc]=SH?ratingPt(r.yoy):rating(r.yoy);const w=r.yoy===null?0:Math.min(50,Math.abs(r.yoy)/lim*50);
     const bar=r.yoy===null?"":`<i style="${r.yoy>=0?"left:50%":"right:50%"};width:${w}%;background:var(${r.yoy>=0?"--u3":"--d3"})"></i>`;
-    return `<tr data-p="${r.p}" class="${r.p===0?"nat ":""}${r.p===S.area?"sel":""}"><td>${PREFS[r.p]}</td><td>${SH?fmtPct(r.cur):fmt(r.cur)}${rk("cur",r)}</td><td class="hide-sm">${SH?fmtPct(r.prev):fmt(r.prev)}${rk("prev",r)}</td><td class="hide-sm ${SH?"":sgn(r.diff)}">${SH?fmt(r.raw):fmtS(r.diff)}${rk(SH?"raw":"diff",r)}</td><td><span class="yb"><span class="${sgn(r.yoy)}">${SH?fmtPt(r.yoy):fmtP(r.yoy)}${rk("yoy",r)}</span><span class="ybar">${bar}</span></span></td><td><span class="chip ${rc}">${rl}</span></td>${ck.map(k=>`<td class="hide-sm cum">${SH?fmtPct(r[k+"Cur"]):fmt(r[k+"Cur"])}</td><td class="cum ${sgn(r[k+"Yoy"])}">${SH?fmtPt(r[k+"Yoy"]):fmtP(r[k+"Yoy"])}</td>`).join("")}${WD?`<td class="wood">${fmtPct(r.wood)}${rk("wood",r)}</td><td class="wood ${sgn(r.woodDiff)}">${fmtPt(r.woodDiff)}</td>`:""}</tr>`};
+    return `<tr data-p="${r.p}" class="${r.p===0?"nat ":""}${r.p===S.area?"sel":""}"><td>${PREFS[r.p]}</td><td>${SH?fmtPct(r.cur):fmt(r.cur)}${rk("cur",r)}</td><td class="hide-sm">${SH?fmtPct(r.prev):fmt(r.prev)}${rk("prev",r)}</td><td class="hide-sm ${SH?"":sgn(r.diff)}">${SH?fmt(r.raw):fmtS(r.diff)}${rk(SH?"raw":"diff",r)}</td><td><span class="yb"><span><span class="${sgn(r.yoy)}">${SH?fmtPt(r.yoy):fmtP(r.yoy)}</span>${rk("yoy",r)}</span><span class="ybar">${bar}</span></span></td><td><span class="chip ${rc}">${rl}</span></td>${ck.map(k=>`<td class="hide-sm cum">${SH?fmtPct(r[k+"Cur"]):fmt(r[k+"Cur"])}</td><td class="cum ${sgn(r[k+"Yoy"])}">${SH?fmtPt(r[k+"Yoy"]):fmtP(r[k+"Yoy"])}</td>`).join("")}${WD?`<td class="wood">${fmtPct(r.wood)}${rk("wood",r)}</td><td class="wood ${sgn(r.woodDiff)}">${fmtPt(r.woodDiff)}</td>`:""}</tr>`};
   $("tbl").tHead.querySelectorAll("th").forEach(th=>{const b=th.querySelector("button");if(b&&/^wood/.test(b.dataset.k))th.classList.add("wood")});
   $("tbl").tBodies[0].innerHTML=tr(rows[0])+body.map(tr).join("");
   $("tbl").classList.toggle("hascum",ck.length>0);
@@ -1442,7 +1451,7 @@ async function buildDocx(secs){
   const u=F.unit?`（${F.unit}）`:"";const kids=[];let secNo=0;const H1n=t=>H1(`${++secNo}. ${t}`);
   kids.push(new Paragraph({spacing:{after:60},children:[new TextRun({text:"住宅着工統計 集計レポート",font:FONT,bold:true,size:36,color:"18221F"})]}));
   kids.push(P(`${SRC.label}　${F.pl}（比較：${F.pp}）`,{size:22,color:"5A6762"}));
-  kids.push(P(`作成：${fmtDT(Date.now())}　住宅着工 景況マップ ver.1.18.0`,{size:18,color:"5A6762"}));
+  kids.push(P(`作成：${fmtDT(Date.now())}　住宅着工 景況マップ ver.1.18.1`,{size:18,color:"5A6762"}));
   if(SRC.kind==="demo")kids.push(P("注意：このレポートは操作確認用の架空データで作成されています。国交省の公表値ではありません。",{bold:true,color:"9A3412"}));
   if(secs.summary){
     kids.push(H1n("概要"));for(const t of summaryText(F))kids.push(P("・"+t));
@@ -1461,7 +1470,7 @@ async function buildDocx(secs){
       return F.SH?[PREFS[r.p],fmtPct(r.cur),fmtPct(r.prev),fmtPt(r.yoy),rl,...cum]:ck.length?[PREFS[r.p],fmt(r.cur),fmt(r.prev),fmtP(r.yoy),rl,...cum]:[PREFS[r.p],fmt(r.cur),fmt(r.prev),fmtS(r.diff),fmtP(r.yoy),rl]});
     const ch=ck.flatMap(k=>[(k==="cy"?"暦年累計":"年度累計")+(F.SH?"構成比":u),(k==="cy"?"暦年":"年度")+(F.SH?"累計前年差":"累計前年比")]);
     if(woodOn()){rows.forEach((row,i)=>{const r=F.rows[i];row.push(fmtPct(r.wood),fmtPt(r.woodDiff))});ch.push("木造化率","木造化率前年差")}
-    if(S.rank){const RK=ranksOf(F.rows,["cur","yoy"]);rows.forEach((row,i)=>{const r=F.rows[i];row.push(r.p?String(RK.cur.get(r.p)??"—"):"",r.p?String(RK.yoy.get(r.p)??"—"):"")});ch.push(F.SH?"構成比順位":"当期順位",F.SH?"前年差順位":"前年比順位")}
+    const rkw=rankKeys(F.SH);if(rkw.length){const RK=ranksOf(F.rows,rkw);const nm=Object.fromEntries(rankCols(F.SH));rows.forEach((row,i)=>{const r=F.rows[i];for(const k of rkw)row.push(r.p?String(RK[k].get(r.p)??"—"):"")});for(const k of rkw)ch.push(nm[k]+"順位")}
     kids.push(table(F.SH?["都道府県","構成比","前年同期","前年差","判定",...ch]:ck.length?["都道府県","当月"+u,"前年同月"+u,"前年同月比","判定",...ch]:["都道府県","当期"+u,"前年同期"+u,"増減","前年同期比","判定"],rows));
     if(ck.length)kids.push(P(ck.map(k=>cumLabel(k)).join("・")+`は${S.Y}年${S.M}月までの累計を前年の同じ期間と比べた値です。`,{size:17,color:"5A6762"}));
     kids.push(P(F.SH?"判定：構成比の前年差 +3pt以上「上昇」、0〜+3pt「微増」、−3〜0pt「微減」、−3pt未満「低下」。":"判定：前年同期比 +10%以上「拡大」、0〜+10%「増加」、−10〜0%「減少」、−10%未満「縮小」。",{size:17,color:"5A6762"}))}
@@ -1527,7 +1536,7 @@ segInit("metricSeg","metric");
 segInit("trendSeg","trend");
 $("ySel").addEventListener("change",e=>{S.Y=+e.target.value;if(S.mode==="range"){syncSpan();save()}render()});
 $("mSel").addEventListener("change",e=>{S.M=+e.target.value;if(S.mode==="range"){syncSpan();save()}render()});
-$("rankChk").addEventListener("change",e=>{S.rank=e.target.checked;save();render()});
+$("rankBar").addEventListener("change",e=>{const k=e.target.dataset&&e.target.dataset.rk;if(!k)return;const a=new Set(S.rank||[]);e.target.checked?a.add(k):a.delete(k);S.rank=[...a];save();render()});
 $("cumSel").addEventListener("change",e=>{S.cum=e.target.value;save();render()});
 $("sySel").addEventListener("change",e=>{S.SY=+e.target.value;syncSpan();save();render()});
 $("smSel").addEventListener("change",e=>{S.SM=+e.target.value;syncSpan();save();render()});
@@ -1539,10 +1548,10 @@ $("openData").addEventListener("click",()=>{const d=$("dataPanel");d.open=true;d
 $("demoBtn").addEventListener("click",async()=>{for(const x of META.list){try{await IDB.del("ds:"+x.key)}catch(e){}}try{await IDB.del("source")}catch(e){}META={active:null,list:[]};await saveMeta();setSource(makeDemo(),false);showSaved("");$("fileStatus").textContent="保存データをすべて消して、架空データに戻しました。"});
 $("copyBtn").addEventListener("click",async()=>{
   const u=LAST.unit?"（"+LAST.unit+"）":"";
-  const ck=cumKinds();const RK=S.rank?ranksOf(LAST.rows,["cur","prev","diff","yoy"]):null;
-  const lines=[["都道府県","当期"+u,"前年同期"+u,"増減","前年同期比(%)","判定",...ck.flatMap(k=>[cumLabel(k)+u,cumLabel(k)+"前年比(%)"]),...(RK?["当期順位","前年同期順位","増減順位","前年比順位"]:[]),...(woodOn()?["木造化率(%)","木造化率前年差(pt)"]:[])].join("\t")];
+  const ck=cumKinds();const rkc=rankKeys(!!LAST.share).filter(k=>["cur","prev","diff","yoy","raw"].includes(k));const RK=rkc.length?ranksOf(LAST.rows,rkc):null;const RKL={cur:"当期順位",prev:"前年同期順位",diff:"増減順位",yoy:"前年比順位",raw:"実数順位"};
+  const lines=[["都道府県","当期"+u,"前年同期"+u,"増減","前年同期比(%)","判定",...ck.flatMap(k=>[cumLabel(k)+u,cumLabel(k)+"前年比(%)"]),...(RK?rkc.map(k=>RKL[k]):[]),...(woodOn()?["木造化率(%)","木造化率前年差(pt)"]:[])].join("\t")];
   const order=[0,...[...$("tbl").tBodies[0].rows].slice(1).map(r=>+r.dataset.p)];
-  for(const p of order){const r=LAST.rows[p];lines.push([PREFS[p],r.cur??"",r.prev??"",r.diff??"",r.yoy===null?"":r.yoy.toFixed(1),rating(r.yoy)[0],...ck.flatMap(k=>[r[k+"Cur"]??"",r[k+"Yoy"]==null?"":r[k+"Yoy"].toFixed(1)]),...(RK?["cur","prev","diff","yoy"].map(k=>RK[k].get(p)??""):[]),...(woodOn()?[r.wood==null?"":r.wood.toFixed(1),r.woodDiff==null?"":r.woodDiff.toFixed(1)]:[])].join("\t"))}
+  for(const p of order){const r=LAST.rows[p];lines.push([PREFS[p],r.cur??"",r.prev??"",r.diff??"",r.yoy===null?"":r.yoy.toFixed(1),rating(r.yoy)[0],...ck.flatMap(k=>[r[k+"Cur"]??"",r[k+"Yoy"]==null?"":r[k+"Yoy"].toFixed(1)]),...(RK?rkc.map(k=>RK[k].get(p)??""):[]),...(woodOn()?[r.wood==null?"":r.wood.toFixed(1),r.woodDiff==null?"":r.woodDiff.toFixed(1)]:[])].join("\t"))}
   const txt=`${$("subtitle").textContent}\n`+lines.join("\n");
   try{await navigator.clipboard.writeText(txt);$("copyBtn").textContent="コピーしました"}catch(e){$("copyBtn").textContent="コピーできませんでした"}
   setTimeout(()=>$("copyBtn").textContent="表をコピー",1800);
