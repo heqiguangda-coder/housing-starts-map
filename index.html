@@ -5,7 +5,7 @@
 <meta name="apple-mobile-web-app-title" content="住宅着工マップ"><meta name="theme-color" content="#f2f4f3" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#111715" media="(prefers-color-scheme: dark)">
 <style>html{-webkit-text-size-adjust:100%}:root{padding-top:env(safe-area-inset-top,0px)}body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
 </head><body>
-<title>住宅着工 景況マップ ver.1.18.1</title>
+<title>住宅着工 景況マップ ver.1.19.0</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=BIZ+UDPMincho:wght@700&display=swap">
@@ -150,6 +150,21 @@ a{color:var(--accent)}
 .fld .lblrow{display:flex;align-items:center;font-size:11px;color:var(--muted);letter-spacing:.06em;font-weight:700}
 @media (max-width:700px){.help{width:26px;height:26px;font-size:14px}}
 dialog.gloss{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(560px,calc(100vw - 32px));max-height:min(80vh,640px);box-shadow:0 12px 40px rgba(0,0,0,.25)}
+.anbar{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin:0 0 14px}
+.anbar .note{margin:0;font-size:12.5px}
+.anbar .btn svg{width:16px;height:16px;vertical-align:-3px;margin-right:5px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+dialog.anl{width:min(720px,calc(100vw - 24px));max-height:min(88vh,860px)}
+.anl .gb{gap:14px}
+.anl .meta{margin:0;font-size:12px;color:var(--muted);line-height:1.6}
+.anl .vd{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--sunk)}
+.anl .vd .chip{flex:none;font-size:13px;padding:3px 10px;margin-top:2px}
+.anl .vd p{margin:0;font-size:14px;line-height:1.7}
+.anl .vd small{display:block;font-size:11px;color:var(--muted)}
+.anl section h4{margin:0 0 4px;font-size:14px;padding-left:8px;border-left:3px solid var(--accent)}
+.anl ul{margin:0;padding-left:1.25em;display:grid;gap:5px}
+.anl li{font-size:13.5px;line-height:1.75}
+.anl .nt li{font-size:12.5px;color:var(--muted)}
+.anl .gf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 16px 14px;border-top:1px solid var(--line);position:sticky;bottom:0;background:var(--surface)}
 dialog.gloss::backdrop{background:rgba(10,16,14,.45)}
 .gloss .gh{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
 .gloss h3{margin:0;font-size:16px}
@@ -254,7 +269,7 @@ section[id],details[id]{scroll-margin-top:12px}
 <div class="wrap">
   <header class="top">
     <div>
-      <h1>住宅着工 景況マップ <span class="ver">ver.1.18.1</span></h1>
+      <h1>住宅着工 景況マップ <span class="ver">ver.1.19.0</span></h1>
       <p class="sub" id="subtitle">国土交通省「建築着工統計調査（住宅着工統計）」に基づく前年同期比の集計</p>
     </div>
     <div class="row">
@@ -303,6 +318,7 @@ section[id],details[id]{scroll-margin-top:12px}
     <div class="kpi"><div class="k" id="kLab3">全国 前年同期比</div><div class="v" id="kYoy">—</div><div class="n" id="kDiff"></div></div>
     <div class="kpi"><div class="k" id="kLab4">都道府県の増減</div><div class="v" id="kCount">—</div><div class="n" id="kCountN"></div></div>
   </section>
+  <div class="anbar"><button class="btn primary" type="button" id="anBtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4zM8 9h8M8 12h5"/></svg>分析コメントを表示</button><span class="note">表示中の条件の集計結果から、増減の要因・基調・地域差を文章でまとめます。</span></div>
 
   <div class="grid2">
     <section class="panel" id="secMap">
@@ -365,6 +381,12 @@ section[id],details[id]{scroll-margin-top:12px}
     <div class="gb" id="glossB"></div>
   </dialog>
 
+  <dialog class="gloss anl" id="anl" aria-labelledby="anlT">
+    <div class="gh"><h3 id="anlT">分析コメント</h3><button type="button" class="x" id="anlX" aria-label="閉じる">×</button></div>
+    <div class="gb" id="anlB"></div>
+    <div class="gf"><button class="btn" type="button" id="anlCopy">文章をコピー</button><button class="btn" type="button" id="anlAI">AI分析用にコピー</button><span class="status" id="anlSt"></span></div>
+  </dialog>
+
   <nav class="tabbar" id="tabbar" aria-label="セクション移動">
     <button type="button" data-t="secCond"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>条件</button>
     <button type="button" data-t="secMap"><svg viewBox="0 0 24 24"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg>地図</button>
@@ -389,6 +411,7 @@ section[id],details[id]{scroll-margin-top:12px}
     <p class="note" style="margin:0 0 10px">いま画面に表示している条件（データ・期間・区分・地域）の集計結果を、Word文書（.docx）にまとめます。メールでの共有や、ほかのAIに読み込ませて分析する資料に使えます。</p>
     <div class="expopts" id="expOpts">
       <label><input type="checkbox" data-sec="summary" checked> 概要と集計条件</label>
+      <label><input type="checkbox" data-sec="anal" checked> 分析コメント</label>
       <label><input type="checkbox" data-sec="map" checked> 地図（画像）</label>
       <label><input type="checkbox" data-sec="pref" checked> 都道府県別一覧</label>
       <label><input type="checkbox" data-sec="region" checked> 地方別</label>
@@ -514,8 +537,8 @@ section[id],details[id]{scroll-margin-top:12px}
         <div class="dslist" id="dsList"></div>
         <button class="btn" id="demoBtn" type="button">保存データをすべて消して架空データに戻す</button>
         <h3 style="margin-top:8px">バージョン</h3>
-        <p style="margin:0">ver.1.18.1（2026-10-16）</p>
-        <ul class="vhist"><li><b>ver.1.18.1</b> 順位の表示を「森林資源 動向マップ」と同じ形に（列ごとのチェックボックス、値の右にラベル）</li><li><b>ver.1.18.0</b> 一覧の都道府県名・市区町村名の列を固定、順位の表示切り替え、地図の期間推移の再生ボタン、木造化率（一覧の列・地図の色分け・Word）</li><li><b>ver.1.17.0</b> APIとExcelのデータを1本につなげて同じ基準で比較（区分名をそろえ、重なる月はExcel値を優先）、自動更新データを2015年まで拡張、保存データへの新しい月・修正の自動取り込み、初回は表15を自動で読み込み</li><li><b>ver.1.16.0</b> 選択した都道府県の市区町村別の色分け地図、単月表示で暦年累計・年度累計を一覧に表示</li><li><b>ver.1.15.0</b> 市区町村別の集計（表15・16・18・6-1・7-1、2024年1月分から）、集計結果のWord出力（地図画像・一覧・AI分析用の説明つき）</li><li><b>ver.1.14.0</b> アプリ名とファイル名にバージョンを表示、変更履歴を追加</li><li><b>ver.1.13.0</b> 集計期間に「期間指定」（開始年月〜終了年月を前年同期間と比較）</li><li><b>ver.1.12.0</b> 月次Excelを毎日自動取得する「自動更新データ」と新しい月の通知</li><li><b>ver.1.11.1</b> 月次Excelの検索で表18・表4-1が見つからない不具合を修正</li><li><b>ver.1.11.0</b> e-Stat APIで建築物の表（表4・5・6-1・7-1）を取得</li><li><b>ver.1.10.0</b> 表4-1（用途×階数×構造）、非住宅（D〜R）、構成比（木造率）、クロス集計</li><li><b>ver.1.9.0</b> 建築物の表5・6-1・7-1の読み込み</li><li><b>ver.1.8.0</b> 表18（構造別・建て方別）の読み込み</li><li><b>ver.1.7.0</b> 表ごとに複数のデータを保存し切り替え</li><li><b>ver.1.6.0</b> 区分の用語説明（？ボタン）</li><li><b>ver.1.5.1</b> 表15・表16のExcel読み取り（市部・郡部の上書き）を修正</li><li><b>ver.1.5.0</b> 読み込んだデータを端末に保存</li><li><b>ver.1.4.1</b> APIのlimitエラーとiPhoneでの表示崩れを修正</li><li><b>ver.1.4.0</b> 月次Excelのダウンロードボタン</li><li><b>ver.1.3.0</b> 国交省の月次Excelの読み込み</li><li><b>ver.1.2.0</b> e-Stat APIで月次表を集めて取得</li><li><b>ver.1.1.0</b> iPhone向けの画面</li><li><b>ver.1.0.0</b> 初版（都道府県別の表と色分け地図、前年同期比）</li></ul>
+        <p style="margin:0">ver.1.19.0（2026-10-27）</p>
+        <ul class="vhist"><li><b>ver.1.19.0</b> 分析コメントを表示するボタン（全国の動き・基調の目安・内訳の寄与度・圏域と都道府県の違い・木造化率・選択地域）、文章コピーとAI分析用コピー、Word出力に分析コメントを追加</li><li><b>ver.1.18.1</b> 順位の表示を「森林資源 動向マップ」と同じ形に（列ごとのチェックボックス、値の右にラベル）</li><li><b>ver.1.18.0</b> 一覧の都道府県名・市区町村名の列を固定、順位の表示切り替え、地図の期間推移の再生ボタン、木造化率（一覧の列・地図の色分け・Word）</li><li><b>ver.1.17.0</b> APIとExcelのデータを1本につなげて同じ基準で比較（区分名をそろえ、重なる月はExcel値を優先）、自動更新データを2015年まで拡張、保存データへの新しい月・修正の自動取り込み、初回は表15を自動で読み込み</li><li><b>ver.1.16.0</b> 選択した都道府県の市区町村別の色分け地図、単月表示で暦年累計・年度累計を一覧に表示</li><li><b>ver.1.15.0</b> 市区町村別の集計（表15・16・18・6-1・7-1、2024年1月分から）、集計結果のWord出力（地図画像・一覧・AI分析用の説明つき）</li><li><b>ver.1.14.0</b> アプリ名とファイル名にバージョンを表示、変更履歴を追加</li><li><b>ver.1.13.0</b> 集計期間に「期間指定」（開始年月〜終了年月を前年同期間と比較）</li><li><b>ver.1.12.0</b> 月次Excelを毎日自動取得する「自動更新データ」と新しい月の通知</li><li><b>ver.1.11.1</b> 月次Excelの検索で表18・表4-1が見つからない不具合を修正</li><li><b>ver.1.11.0</b> e-Stat APIで建築物の表（表4・5・6-1・7-1）を取得</li><li><b>ver.1.10.0</b> 表4-1（用途×階数×構造）、非住宅（D〜R）、構成比（木造率）、クロス集計</li><li><b>ver.1.9.0</b> 建築物の表5・6-1・7-1の読み込み</li><li><b>ver.1.8.0</b> 表18（構造別・建て方別）の読み込み</li><li><b>ver.1.7.0</b> 表ごとに複数のデータを保存し切り替え</li><li><b>ver.1.6.0</b> 区分の用語説明（？ボタン）</li><li><b>ver.1.5.1</b> 表15・表16のExcel読み取り（市部・郡部の上書き）を修正</li><li><b>ver.1.5.0</b> 読み込んだデータを端末に保存</li><li><b>ver.1.4.1</b> APIのlimitエラーとiPhoneでの表示崩れを修正</li><li><b>ver.1.4.0</b> 月次Excelのダウンロードボタン</li><li><b>ver.1.3.0</b> 国交省の月次Excelの読み込み</li><li><b>ver.1.2.0</b> e-Stat APIで月次表を集めて取得</li><li><b>ver.1.1.0</b> iPhone向けの画面</li><li><b>ver.1.0.0</b> 初版（都道府県別の表と色分け地図、前年同期比）</li></ul>
         <h3 style="margin-top:8px">出典と注意</h3>
         <p>市区町村の地図：「国土数値情報（行政区域データ）」（国土交通省）を加工して作成（加工データ：スマートニュース メディア研究所）。原典：国土交通省「<a href="https://www.mlit.go.jp/sogoseisaku/jouhouka/sosei_jouhouka_tk4_000002.html" target="_blank" rel="noopener">建築着工統計調査</a>」（毎月末頃に前月分を公表）、<a href="https://www.e-stat.go.jp/stat-search/database?toukei=00600120" target="_blank" rel="noopener">e-Stat</a>。統計表の「−」は0、「…」「x」は欠測として扱います。累計・年計は月次値の合計で、期間内に欠測月があると表示しません。1戸あたり工事費など比率の指標は合計できないため単月で見てください。</p>
       </section>
@@ -857,7 +880,7 @@ function allYears(){
 const nf=new Intl.NumberFormat("ja-JP",{maximumFractionDigits:0});
 const fmt=v=>v===null||v===undefined?"—":nf.format(v);
 const fmtS=v=>v===null||v===undefined?"—":(v>0?"+":v<0?"−":"±")+nf.format(Math.abs(v));
-const fmtP=v=>v===null||v===undefined?"—":(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(1)+"%";
+const fmtP=v=>v===null||v===undefined?"—":(Math.abs(v)<0.05?"±":v>0?"+":"−")+Math.abs(v).toFixed(1)+"%";
 const sgn=v=>v===null||v===undefined?"":v>0?"pos":v<0?"neg":"";
 function rating(y){if(y===null)return ["—","c-na"];if(y>=10)return ["拡大","c-u3"];if(y>=0)return ["増加","c-u1"];if(y>-10)return ["減少","c-d1"];return ["縮小","c-d3"]}
 const YOYB=[-20,-10,-5,0,5,10,20];const YOYC=["--d4","--d3","--d2","--d1","--u1","--u2","--u3","--u4"];
@@ -1063,7 +1086,7 @@ function addCum(rows,sel,sd){
 }
 function shareDim(){if(!SRC)return null;const c=SRC.dims.filter(d=>d.values.includes("計")&&S.sel[d.name]!=="計"&&!/表章/.test(d.name));return c.find(d=>/構造/.test(d.name))||c[0]||null}
 const fmtPct=v=>v===null||v===undefined?"—":v.toFixed(1)+"%";
-const fmtPt=v=>v===null||v===undefined?"—":(v>0?"+":v<0?"−":"±")+Math.abs(v).toFixed(1)+"pt";
+const fmtPt=v=>v===null||v===undefined?"—":(Math.abs(v)<0.05?"±":v>0?"+":"−")+Math.abs(v).toFixed(1)+"pt";
 function ratingPt(d){if(d===null)return ["—","c-na"];if(d>=3)return ["上昇","c-u3"];if(d>=0)return ["微増","c-u1"];if(d>-3)return ["微減","c-d1"];return ["低下","c-d3"]}
 let LAST={};
 function renderMap(rows,unit,fixed){
@@ -1387,6 +1410,226 @@ $("cityTbl").addEventListener("click",e=>{const tr=e.target.closest("tbody tr[da
 $("cityTbl").addEventListener("click",e=>{const b=e.target.closest("th button");if(!b)return;const k=b.dataset.ck;if(CS.sortK===k)CS.sortD*=-1;else{CS.sortK=k;CS.sortD=k==="code"?1:-1}drawCity()});
 $("cityQ").addEventListener("input",drawCity);$("cityWard").addEventListener("change",drawCity);
 
+/* ---------- 分析コメント ---------- */
+const TOTV=/^(計|総数|合計|総計)$/;
+const METRO=[["首都圏",[11,12,13,14]],["中部圏",[21,22,23,24]],["近畿圏",[25,26,27,28,29,30]]];
+function anEnd(){return S.mode==="year"?[S.Y,12]:S.mode==="fy"?[S.Y+1,3]:[S.Y,S.M]}
+function anParts(d){return d.values.filter(v=>!TOTV.test(v)&&!/〜/.test(v)&&!/^うち|再掲/.test(v))}
+const anPrefs=a=>a.map(([p,v])=>`${PREFS[p]}（${v}）`).join("、");
+// 区分ごとの寄与度：各区分の増減 ÷ 前年同期の計 × 100（pt）。内訳の合計が計と合わない区分は使わない
+function anContribs(p){
+  const out=[];const tot=agg(selKey(S.sel),p,S.mode,S.Y,S.M);
+  if(tot.cur===null||tot.prev===null||!(tot.prev>0))return out;
+  for(const d of SRC.dims){
+    if(/表章/.test(d.name)||!TOTV.test(S.sel[d.name]))continue;
+    const parts=anParts(d);if(parts.length<2)continue;
+    const it=parts.map(v=>({name:v,...agg(selKey({...S.sel,[d.name]:v}),p,S.mode,S.Y,S.M)}));
+    if(it.some(x=>x.cur===null||x.prev===null))continue;
+    const sc=it.reduce((s,x)=>s+x.cur,0),sp=it.reduce((s,x)=>s+x.prev,0);
+    if(Math.abs(sc-tot.cur)>Math.max(2,tot.cur*.03)||Math.abs(sp-tot.prev)>Math.max(2,tot.prev*.03))continue;
+    it.forEach(x=>{x.ct=x.diff/tot.prev*100;x.sh=tot.cur>0?x.cur/tot.cur*100:null});
+    out.push({dim:d.name.replace(/別$/,""),tot,items:it});
+  }
+  return out;
+}
+function anCtText(c){
+  const f=x=>`${x.name}（${x.yoy===null?"前年同期0":fmtP(x.yoy)}、寄与度${fmtPt(x.ct).replace("pt","ポイント")}）`;
+  const s=c.items.slice().sort((a,b)=>a.ct-b.ct);
+  const neg=s.filter(x=>x.ct<=-0.05),pos=s.filter(x=>x.ct>=0.05).reverse();
+  let t=`${c.dim}別では、`;
+  if(!neg.length&&!pos.length)return t+"どの区分も前年同期並みでした。";
+  if((c.tot.diff??0)<0){t+=neg.length?`減少の主因は${neg.slice(0,2).map(f).join("、")}です。`:"";if(pos.length)t+=`一方、${pos.slice(0,2).map(f).join("、")}は増えて下支えしました。`}
+  else{t+=pos.length?`増加をけん引したのは${pos.slice(0,2).map(f).join("、")}です。`:"";if(neg.length)t+=`一方、${neg.slice(0,2).map(f).join("、")}は減りました。`}
+  const big=c.items.slice().sort((a,b)=>(b.sh??0)-(a.sh??0))[0];
+  if(big&&big.sh!==null)t+=`構成比が最も大きいのは${big.name}（${big.sh.toFixed(1)}%）です。`;
+  return t;
+}
+// 同じ期間の過去の年との比較
+function anHist(valFn){
+  const ys=allYears().filter(y=>y<=S.Y&&hasPeriod(S.mode,y,S.M));
+  const v=ys.map(y=>({y,v:valFn(y)})).filter(x=>x.v!==null&&x.v!==undefined&&isFinite(x.v));
+  const cur=v.find(x=>x.y===S.Y);if(!cur||v.length<4)return null;
+  const before=v.filter(x=>x.y<S.Y).reverse();
+  return {n:v.length,from:v[0].y,hi:v.filter(x=>x.v>cur.v).length+1,lo:v.filter(x=>x.v<cur.v).length+1,
+    lowSince:before.find(x=>x.v<=cur.v),highSince:before.find(x=>x.v>=cur.v),cur:cur.v};
+}
+function anHistText(H,fv,words=["多い","少ない"]){
+  if(!H)return "";
+  const span=`比較できる${H.from}${S.mode==="fy"?"年度":"年"}以降の${H.n}${S.mode==="fy"?"年度":"年"}の同じ期間の中で`;
+  const pl=y=>periodLabel(S.mode,y,S.M);
+  if(H.hi<=H.lo){
+    if(H.hi===1)return `${span}最も${words[0]}水準です。`;
+    if(H.highSince&&H.highSince.y<S.Y-1)return `${pl(H.highSince.y)}（${fv(H.highSince.v)}）以来の${words[0]}水準で、${span}${H.hi}番目です。`;
+    return `${span}${H.hi}番目に${words[0]}水準です。`}
+  if(H.lo===1)return `${span}最も${words[1]}水準です。`;
+  if(H.lowSince&&H.lowSince.y<S.Y-1)return `${pl(H.lowSince.y)}（${fv(H.lowSince.v)}）以来の${words[1]}水準で、${span}${H.lo}番目です。`;
+  return `${span}${H.lo}番目に${words[1]}水準です。`;
+}
+// 月次の勢い：直近の前年同月比の連続、3か月・12か月合計の前年比
+function anMomentum(sel,p){
+  if(!SRC.months.length)return null;
+  let [y,m]=anEnd();const pts=[];
+  for(let i=0;i<24;i++){pts.unshift({y,m,...agg(sel,p,"month",y,m)});m--;if(!m){m=12;y--}}
+  const l12=pts.slice(-12),ok=l12.filter(x=>x.yoy!==null);if(ok.length<6)return null;
+  const e=pts[pts.length-1];
+  const yy=a=>{let c=0,pv=0;for(const x of a){if(x.cur===null||x.prev===null)return null;c+=x.cur;pv+=x.prev}return pv>0?(c/pv-1)*100:null};
+  let k=0;const sg=e.yoy===null?0:Math.sign(e.yoy);
+  if(sg)for(let i=pts.length-1;i>=0&&pts[i].yoy!==null&&Math.sign(pts[i].yoy)===sg;i--)k++;
+  const pr=pts[pts.length-2];
+  return {e,sg,streak:k,prevSg:pr&&pr.yoy!==null?Math.sign(pr.yoy):null,up:ok.filter(x=>x.yoy>0).length,n:ok.length,
+    y3:yy(pts.slice(-3)),y12:yy(l12),start:l12[0]};
+}
+function anMomText(M,unitWord){
+  const L=[];if(!M)return L;
+  const ml=x=>`${x.y}年${x.m}月`;
+  if(M.sg&&M.streak>=2)L.push(`前年同月比は${ml(M.e)}まで${M.streak}か月連続の${M.sg>0?"増加":"減少"}です（${ml(M.e)}：${fmtP(M.e.yoy)}）。`);
+  else if(M.sg&&M.prevSg&&M.prevSg!==M.sg)L.push(`${ml(M.e)}は前年同月比${fmtP(M.e.yoy)}で、前月の${M.prevSg>0?"増加":"減少"}から${M.sg>0?"増加":"減少"}に転じました。`);
+  L.push(`直近12か月（${ml(M.start)}〜${ml(M.e)}）のうち、前年同月を上回ったのは${M.up}か月${M.n<12?`（比較できた${M.n}か月中）`:""}です。`);
+  if(M.y3!==null||M.y12!==null)L.push(`合計で見た前年比は、直近3か月が${fmtP(M.y3)}、直近12か月が${fmtP(M.y12)}です。`);
+  return L;
+}
+function anVerdict(a,b){
+  if(a===null&&b===null)return null;
+  if(a===null||b===null){const v=a??b;return v>=3?["増加基調","c-u3"]:v<=-3?["減少基調","c-d3"]:["横ばい圏","c-na"]}
+  const d=a-b;
+  if(d>=3)return a>=0?(b>=1?["増勢が強まる","c-u3"]:["持ち直し","c-u1"]):["下げ止まりの兆し","c-d1"];
+  if(d<=-3)return a<0?(b<=-1?["減少が加速","c-d3"]:["弱含み","c-d1"]):["増勢が鈍化","c-u1"];
+  return a>=3?["増加基調","c-u3"]:a<=-3?["減少基調","c-d3"]:["横ばい圏","c-na"];
+}
+function analysis(){
+  const sel=selKey(S.sel),unit=SRC.unit(sel)||"",rows=LAST.rows,SH=!!LAST.share,n=rows[0];
+  const pl=periodLabel(S.mode,S.Y,S.M),pp=periodLabel(S.mode,S.Y-1,S.M);
+  const itemD=SRC.dims.find(d=>/表章/.test(d.name)),itemV=itemD?S.sel[itemD.name]:"";
+  const what=SRC.dims.filter(d=>!/表章/.test(d.name)).map(d=>S.sel[d.name]).filter(v=>!TOTV.test(v)).join("・")||"総数";
+  const A={pl,pp,what,item:itemV,secs:[],notes:[],vd:null};
+  const fu=v=>fmt(v)+unit;
+  if(!rows||n.cur===null){A.empty="この条件では全国の当期の値を集計できないため、分析コメントを作れません。期間や読み込んだデータを確認してください。";return A}
+  const valid=rows.slice(1);
+  if(SH){
+    const sh=LAST.share,nm=shName(sh),den=selKey({...S.sel,[sh.dim]:"計"});
+    const ctx=SRC.dims.filter(d=>!/表章/.test(d.name)&&d.name!==sh.dim).map(d=>S.sel[d.name]).filter(v=>!TOTV.test(v)).join("・");
+    const ov=[];
+    ov.push(`${pl}の全国の${ctx?ctx+"のうち、":""}${nm}${itemV?`（${itemV}ベース）`:""}は${fmtPct(n.cur)}で、前年同期（${pp}）の${fmtPct(n.prev)}から${fmtPt(n.diff)}でした。`);
+    const a=agg(sel,0,S.mode,S.Y,S.M),b=agg(den,0,S.mode,S.Y,S.M);
+    if(a.yoy!==null&&b.yoy!==null)ov.push(`実数では${sh.val}が${fu(a.cur)}（前年同期比${fmtP(a.yoy)}）、${sh.dim}の計が${fu(b.cur)}（${fmtP(b.yoy)}）です。${a.yoy>b.yoy?`${sh.val}が計${b.yoy<0?"ほど減らなかった":"を上回って伸びた"}ため、割合が上がりました。`:a.yoy<b.yoy?`${sh.val}が計${b.yoy>0?"ほど伸びなかった":"以上に減った"}ため、割合が下がりました。`:""}`);
+    const shv=y=>{const x=aggP(sel,0,S.mode,y,S.M),z=aggP(den,0,S.mode,y,S.M);return x!==null&&z>0?x/z*100:null};
+    const ht=anHistText(anHist(shv),fmtPct,["高い","低い"]);if(ht)ov.push(ht);
+    let d12=null;
+    if(SRC.months.length){const [ey,em]=anEnd();const x=agg(sel,0,"ttm",ey,em),z=agg(den,0,"ttm",ey,em);
+      if(x.cur!==null&&z.cur>0&&x.prev!==null&&z.prev>0){const c=x.cur/z.cur*100,p=x.prev/z.prev*100;d12=c-p;
+        ov.push(`直近12か月（${periodLabel("ttm",ey,em)}）の合計で見ると${fmtPct(c)}で、その前の12か月（${fmtPct(p)}）から${fmtPt(d12)}です。`)}}
+    A.secs.push({h:"全国の動き",items:ov});
+    const v=d12??n.diff;
+    if(v!==null){const L=v>=1?["上昇基調","c-u3"]:v>=0.3?["やや上昇","c-u1"]:v<=-1?["低下基調","c-d3"]:v<=-0.3?["やや低下","c-d1"]:["横ばい圏","c-na"];
+      A.vd=[L[0],L[1],`全国の${nm}は前年同期から${fmtPt(n.diff)}${d12!==null?`、直近12か月では${fmtPt(d12)}`:""}。`]}
+    const rg=[];const ok=valid.filter(r=>r.cur!==null);
+    const up=valid.filter(r=>r.diff!==null&&r.diff>0).length,dn=valid.filter(r=>r.diff!==null&&r.diff<0).length;
+    rg.push(`${nm}が前年同期より上がった都道府県は${up}、下がった都道府県は${dn}です。`);
+    if(ok.length>=6){const s=ok.slice().sort((a,b)=>b.cur-a.cur);
+      rg.push(`${nm}が高いのは${anPrefs(s.slice(0,3).map(r=>[r.p,fmtPct(r.cur)]))}、低いのは${anPrefs(s.slice(-3).reverse().map(r=>[r.p,fmtPct(r.cur)]))}です。`)}
+    const thr=(n.den||0)/47*0.3,small=r=>{const z=agg(den,r.p,S.mode,S.Y-1,S.M);return z.cur!==null&&z.cur<thr};let flag=false;
+    const ch=valid.filter(r=>r.diff!==null).sort((a,b)=>b.diff-a.diff);
+    const lab=r=>{const s=small(r);if(s)flag=true;return [r.p,fmtPt(r.diff)+(s?"※":"")]};
+    if(ch.length>=6)rg.push(`上昇幅が大きいのは${anPrefs(ch.slice(0,3).filter(r=>r.diff>0).map(lab))||"—"}、低下幅が大きいのは${anPrefs(ch.slice(-3).reverse().filter(r=>r.diff<0).map(lab))||"—"}です。`);
+    if(flag)rg.push("※は前年同期の計が少なく、割合が大きく振れやすい県です。");
+    A.secs.push({h:"都道府県・地域の違い",items:rg});
+    if(S.area){const r=rows[S.area],R=ranksOf(rows,["cur","diff"]);const L=[];
+      L.push(`${PREFS[S.area]}の${nm}は${fmtPct(r.cur)}（前年同期${fmtPct(r.prev)}、${fmtPt(r.diff)}）で、47都道府県中${R.cur.get(S.area)??"—"}位です。`);
+      if(r.cur!==null&&n.cur!==null)L.push(`全国（${fmtPct(n.cur)}）を${Math.abs(r.cur-n.cur).toFixed(1)}ポイント${r.cur>=n.cur?"上回って":"下回って"}います。`);
+      A.secs.push({h:`${PREFS[S.area]}について`,items:L})}
+  }else{
+    const ov=[];
+    ov.push(`${pl}の全国の${what}${itemV?`（${itemV}）`:""}は${fu(n.cur)}で、`+(n.yoy!==null?`前年同期（${pp}）の${fu(n.prev)}に比べ${fmtP(n.yoy)}（${fmtS(n.diff)}${unit}）でした。`:"前年同期の値がないため比較できません。"));
+    const ht=anHistText(anHist(y=>aggP(sel,0,S.mode,y,S.M)),fu);if(ht)ov.push(ht);
+    if(S.mode==="month"){const c=[];for(const [k,md] of [["cy","ytd"],["fy","fytd"]]){const x=agg(sel,0,md,S.Y,S.M);if(x.cur!==null)c.push(`${cumLabel(k)}は${fu(x.cur)}（前年比${fmtP(x.yoy)}）`)}if(c.length)ov.push(c.join("、")+"です。")}
+    A.secs.push({h:"全国の動き",items:ov});
+    const M=anMomentum(sel,0);
+    const mt=anMomText(M);
+    if(M&&S.mode==="month"&&n.yoy!==null&&M.y3!==null&&Math.sign(n.yoy)!==Math.sign(M.y3)&&Math.abs(n.yoy)>=5)mt.push(`単月では${fmtP(n.yoy)}ですが、3か月でならすと${fmtP(M.y3)}です。単月の振れが大きく出ている可能性があります。`);
+    if(mt.length)A.secs.push({h:"基調（月次の流れ）",items:mt});
+    const v=anVerdict(M?M.y3:n.yoy,M?M.y12:null);
+    if(v)A.vd=[v[0],v[1],M&&M.y3!==null&&M.y12!==null?`全国は直近3か月の合計が前年比${fmtP(M.y3)}、直近12か月が${fmtP(M.y12)}。当期（${pl}）は${fmtP(n.yoy)}です。`:`全国は前年同期比${fmtP(n.yoy)}です。`];
+    const cts=anContribs(0);
+    if(cts.length)A.secs.push({h:"内訳から見た増減の要因（全国）",items:cts.slice(0,3).map(anCtText)});
+    const rg=[];
+    const up=valid.filter(r=>r.yoy!==null&&r.yoy>0).length,dn=valid.filter(r=>r.yoy!==null&&r.yoy<0).length;
+    rg.push(`前年同期より増えた都道府県は${up}、減った都道府県は${dn}です。`);
+    const mr=METRO.map(([nm,ids])=>({nm,...aggRegion(sel,ids)}));const mids=new Set(METRO.flatMap(x=>x[1]));
+    mr.push({nm:"その他の地域",...aggRegion(sel,Array.from({length:47},(_,i)=>i+1).filter(i=>!mids.has(i)))});
+    if(mr.every(x=>x.yoy!==null))rg.push(`圏域別では、${mr.map(x=>`${x.nm}${fmtP(x.yoy)}`).join("、")}です。`+(n.cur>0?`三大都市圏が全国に占める割合は${((n.cur-mr[3].cur)/n.cur*100).toFixed(1)}%です。`:""));
+    const reg=REGIONS.map(([nm,ids])=>({nm,...aggRegion(sel,ids)})).filter(r=>r.yoy!==null).sort((a,b)=>b.yoy-a.yoy);
+    if(reg.length>=3)rg.push(`地方別の伸び率は${reg[0].nm}（${fmtP(reg[0].yoy)}）が最も高く、${reg[reg.length-1].nm}（${fmtP(reg[reg.length-1].yoy)}）が最も低くなりました。`);
+    const df=valid.filter(r=>r.diff!==null).sort((a,b)=>b.diff-a.diff);
+    if(df.length>=6&&n.prev>0){const pz=df.filter(r=>r.diff>0).slice(0,3),ng=df.filter(r=>r.diff<0).slice(-3).reverse();
+      const lb=r=>[r.p,`${fmtS(r.diff)}${unit}`];
+      rg.push(`全国の増減への影響が大きいのは、増えた側で${pz.length?anPrefs(pz.map(lb)):"なし"}、減った側で${ng.length?anPrefs(ng.map(lb)):"なし"}です。`)}
+    const yr=valid.filter(r=>r.yoy!==null).sort((a,b)=>b.yoy-a.yoy);
+    if(yr.length>=6){const thr=(n.prev||0)/47*0.3;let flag=false;const lb=r=>{const s=r.prev!==null&&r.prev<thr;if(s)flag=true;return [r.p,fmtP(r.yoy)+(s?"※":"")]};
+      rg.push(`伸び率が高いのは${anPrefs(yr.slice(0,3).map(lb))}、低いのは${anPrefs(yr.slice(-3).reverse().map(lb))}です。`);
+      if(flag)rg.push("※は前年同期の数が少なく、伸び率が大きく振れやすい県です。")}
+    A.secs.push({h:"都道府県・地域の違い",items:rg});
+    if(woodOn()&&n.wood!=null){const wd=woodDim(),kw=selKey({...S.sel,[wd.name]:"木造"}),kt=selKey({...S.sel,[wd.name]:"計"});const W=[];
+      W.push(`全国の木造化率は${fmtPct(n.wood)}で、前年同期（${fmtPct(n.woodPrev)}）から${fmtPt(n.woodDiff)}でした。`);
+      const wh=anHistText(anHist(y=>{const x=aggP(kw,0,S.mode,y,S.M),z=aggP(kt,0,S.mode,y,S.M);return x!==null&&z>0?x/z*100:null}),fmtPct,["高い","低い"]);if(wh)W.push(wh);
+      const w=valid.filter(r=>r.wood!=null);const wu=valid.filter(r=>r.woodDiff!=null&&r.woodDiff>0).length,wdn=valid.filter(r=>r.woodDiff!=null&&r.woodDiff<0).length;
+      W.push(`木造化率が上がった都道府県は${wu}、下がった都道府県は${wdn}です。`);
+      if(w.length>=6){const s=w.slice().sort((a,b)=>b.wood-a.wood);W.push(`木造化率が高いのは${anPrefs(s.slice(0,3).map(r=>[r.p,fmtPct(r.wood)]))}、低いのは${anPrefs(s.slice(-3).reverse().map(r=>[r.p,fmtPct(r.wood)]))}です。`)}
+      A.secs.push({h:"木造化率",items:W})}
+    if(S.area){const r=rows[S.area],R=ranksOf(rows,["yoy","cur"]);const L=[];
+      L.push(`${PREFS[S.area]}は${fu(r.cur)}（前年同期比${fmtP(r.yoy)}、${fmtS(r.diff)}${unit}）で、全国の${n.cur>0&&r.cur!==null?(r.cur/n.cur*100).toFixed(1):"—"}%を占めます。`);
+      if(r.yoy!==null)L.push(`前年同期比は47都道府県中${R.yoy.get(S.area)}位で、全国（${fmtP(n.yoy)}）を${Math.abs(r.yoy-(n.yoy??0)).toFixed(1)}ポイント${r.yoy>=(n.yoy??0)?"上回って":"下回って"}います。`);
+      const h=anHistText(anHist(y=>aggP(sel,S.area,S.mode,y,S.M)),fu);if(h)L.push(h);
+      const am=anMomentum(sel,S.area);if(am){if(am.y3!==null||am.y12!==null)L.push(`直近3か月の合計は前年比${fmtP(am.y3)}、直近12か月は${fmtP(am.y12)}です。`);if(am.sg&&am.streak>=2)L.push(`前年同月比は${am.streak}か月連続の${am.sg>0?"増加":"減少"}です。`)}
+      const ac=anContribs(S.area);for(const c of ac.slice(0,2))L.push(anCtText(c));
+      if(woodOn()&&r.wood!=null)L.push(`木造化率は${fmtPct(r.wood)}（前年差${fmtPt(r.woodDiff)}）です。`);
+      A.secs.push({h:`${PREFS[S.area]}について`,items:L})}
+  }
+  A.notes.push("このコメントは、表示中の集計値からアプリが決まった手順で作った文章です。金利・資材価格・制度改正などの背景要因の判断は含みません。");
+  if(SH)A.notes.push("「基調の目安」は、直近12か月合計の割合の前年差（月次データがないときは当期の前年差）で機械的に判定したものです（±1ポイント以上で上昇・低下、±0.3ポイント以上でやや上昇・やや低下）。国交省の公式な判断ではありません。");
+  else{A.notes.push("「基調の目安」は、直近3か月と12か月の合計の前年比を比べて機械的に判定したものです（3か月の伸びが12か月を3ポイント以上上回れば改善、下回れば悪化と判定）。国交省の公式な判断ではありません。");
+    if(A.secs.some(s=>/寄与度/.test(s.items.join(""))))A.notes.push("寄与度は、各区分の増減が全体の前年比を何ポイント動かしたかを表します（各区分の増減 ÷ 前年同期の計 × 100）。")}
+  if(S.mode==="month")A.notes.push("単月の値は、大型の共同住宅などの着工で大きく振れることがあります。累計や直近12か月の動きと合わせて見てください。");
+  if(SRC.kind==="demo")A.notes.push("表示中は操作確認用の架空データです。実際の統計とは関係ありません。");
+  return A;
+}
+function anHTML(A){
+  let h=`<p class="meta">${esc(SRC.label)}<br>${esc(A.pl)}　${esc(A.what)}${A.item?"（"+esc(A.item)+"）":""}　比較：${esc(A.pp)}${S.area?"　表示中の地域："+esc(PREFS[S.area]):""}</p>`;
+  if(A.empty)return h+`<p>${esc(A.empty)}</p>`;
+  if(A.vd)h+=`<div class="vd"><span class="chip ${A.vd[1]}">${esc(A.vd[0])}</span><p><small>基調の目安</small>${esc(A.vd[2])}</p></div>`;
+  for(const s of A.secs)if(s.items.length)h+=`<section><h4>${esc(s.h)}</h4><ul>${s.items.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>`;
+  if(A.notes.length)h+=`<section class="nt"><h4>読み方の注意</h4><ul>${A.notes.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>`;
+  return h;
+}
+function anText(A){
+  const L=[`【分析コメント】${A.pl}　${A.what}${A.item?"（"+A.item+"）":""}（比較：${A.pp}）${S.area?"　地域："+PREFS[S.area]:""}`,`データ：${SRC.label}`];
+  if(A.empty){L.push(A.empty);return L.join("\n")}
+  if(A.vd)L.push("",`基調の目安：${A.vd[0]}　${A.vd[2]}`);
+  for(const s of A.secs)if(s.items.length){L.push("",`■${s.h}`);for(const x of s.items)L.push("・"+x)}
+  if(A.notes.length){L.push("","■読み方の注意");for(const x of A.notes)L.push("・"+x)}
+  return L.join("\n");
+}
+function anAIText(A){
+  const sel=selKey(S.sel),u=SRC.unit(sel)||"",SH=!!LAST.share;
+  const L=["以下は、国土交通省「建築着工統計調査」の公表値を、アプリ「住宅着工 景況マップ」で集計した結果です。",
+    "この数値をもとに、住宅着工の景況感を分析してください。①全体の動きと基調、②増減の要因（区分・地域）、③今後注意して見るべき点、の順に整理し、数値は資料の値だけを使ってください。背景要因（金利、資材価格、制度改正など）に触れる場合は、推測であることを明記してください。",""];
+  L.push("【集計条件】",`データ：${SRC.label}`,`集計期間：${A.pl}（比較：前年同期 ${A.pp}）`,...SRC.dims.map(d=>`${d.name}：${S.sel[d.name]}`),`単位：${u||"—"}`,"");
+  L.push(anText(A),"","【都道府県別】");
+  L.push(SH?["都道府県",shName(LAST.share)+"(%)","前年同期(%)","前年差(pt)","実数"+(u?"("+u+")":"")].join("\t"):["都道府県","当期"+(u?"("+u+")":""),"前年同期","増減","前年同期比(%)"].join("\t"));
+  for(const r of LAST.rows)L.push(SH?[PREFS[r.p],r.cur==null?"":r.cur.toFixed(1),r.prev==null?"":r.prev.toFixed(1),r.diff==null?"":r.diff.toFixed(1),r.raw??""].join("\t"):[PREFS[r.p],r.cur??"",r.prev??"",r.diff??"",r.yoy==null?"":r.yoy.toFixed(1)].join("\t"));
+  return L.join("\n");
+}
+let ANL=null;
+$("anBtn").addEventListener("click",()=>{
+  if(!SRC)return;if(PLAY.timer)stopPlay(true);
+  ANL=analysis();$("anlB").innerHTML=anHTML(ANL);$("anlSt").textContent="";
+  const dl=$("anl");try{dl.showModal()}catch(e){dl.setAttribute("open","")}$("anlB").scrollTop=0;dl.scrollTop=0;
+});
+$("anlX").addEventListener("click",()=>$("anl").close?$("anl").close():$("anl").removeAttribute("open"));
+$("anl").addEventListener("click",e=>{if(e.target===$("anl"))$("anl").close()});
+async function anCopy(txt,msg){try{await navigator.clipboard.writeText(txt);$("anlSt").textContent=msg}catch(e){$("anlSt").textContent="コピーできませんでした"}}
+$("anlCopy").addEventListener("click",()=>ANL&&anCopy(anText(ANL),"コピーしました"));
+$("anlAI").addEventListener("click",()=>ANL&&anCopy(anAIText(ANL),"コピーしました。ほかのAIに貼り付けて使えます"));
+
 /* ---------- Word出力 ---------- */
 let DOCXP=null,EXP=null;
 function loadDocx(){return DOCXP||(DOCXP=new Promise((res,rej)=>{if(window.docx)return res(window.docx);
@@ -1451,7 +1694,7 @@ async function buildDocx(secs){
   const u=F.unit?`（${F.unit}）`:"";const kids=[];let secNo=0;const H1n=t=>H1(`${++secNo}. ${t}`);
   kids.push(new Paragraph({spacing:{after:60},children:[new TextRun({text:"住宅着工統計 集計レポート",font:FONT,bold:true,size:36,color:"18221F"})]}));
   kids.push(P(`${SRC.label}　${F.pl}（比較：${F.pp}）`,{size:22,color:"5A6762"}));
-  kids.push(P(`作成：${fmtDT(Date.now())}　住宅着工 景況マップ ver.1.18.1`,{size:18,color:"5A6762"}));
+  kids.push(P(`作成：${fmtDT(Date.now())}　住宅着工 景況マップ ver.1.19.0`,{size:18,color:"5A6762"}));
   if(SRC.kind==="demo")kids.push(P("注意：このレポートは操作確認用の架空データで作成されています。国交省の公表値ではありません。",{bold:true,color:"9A3412"}));
   if(secs.summary){
     kids.push(H1n("概要"));for(const t of summaryText(F))kids.push(P("・"+t));
@@ -1462,6 +1705,11 @@ async function buildDocx(secs){
     kids.push(F.SH?table(["指標","当期","前年同期","前年差"],[[shName(LAST.share),fmtPct(n.cur),fmtPct(n.prev),fmtPt(n.diff)],["実数（当期）",fmt(n.raw)+(F.unit||""),"",""],["計（当期）",fmt(n.den)+(F.unit||""),"",""]])
       :table(["指標","当期","前年同期","増減","前年同期比"],[[`全国${u}`,fmt(n.cur),fmt(n.prev),fmtS(n.diff),fmtP(n.yoy)]]));
   }
+  if(secs.anal){const A=analysis();kids.push(H1n("分析コメント"));
+    if(A.empty)kids.push(P(A.empty));else{
+      if(A.vd)kids.push(P(`基調の目安：${A.vd[0]}　${A.vd[2]}`,{bold:true}));
+      for(const s of A.secs)if(s.items.length){kids.push(H2(s.h));for(const x of s.items)kids.push(P("・"+x))}
+      if(A.notes.length){kids.push(H2("読み方の注意"));for(const x of A.notes)kids.push(P("・"+x,{size:19,color:"5A6762"}))}}}
   if(secs.map){try{const img=await mapPng();kids.push(H1n("都道府県別の地図"));kids.push(P(`色分け：${F.metric}`,{size:18,color:"5A6762",keepNext:true}));
     const w=440,h=Math.round(w*img.h/img.w);kids.push(new Paragraph({alignment:AlignmentType.CENTER,children:[new ImageRun({data:img.data,transformation:{width:w,height:h},type:"png"})]}))}catch(e){kids.push(P("（地図画像を作成できませんでした）"))}}
   if(secs.pref){kids.push(H1n("都道府県別一覧"));
